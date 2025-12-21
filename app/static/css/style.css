@@ -1298,8 +1298,9 @@ a:hover {
 }
 
 .saved-paper-card {
-    display: flex;
-    gap: var(--space-lg);
+    display: flex !important;
+    flex-direction: column !important;
+    gap: var(--space-md);
     padding: var(--space-lg);
     background: var(--gradient-card);
     border: 1px solid var(--color-border);
@@ -1313,6 +1314,7 @@ a:hover {
 
 .paper-content {
     flex: 1;
+    width: 100%;
 }
 
 .paper-meta {
@@ -1330,29 +1332,36 @@ a:hover {
 }
 
 .paper-sidebar {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: flex-start;
+    align-items: center;
+    flex-wrap: wrap;
+    width: 100%;
+    padding-top: var(--space-sm);
+    border-top: 1px solid var(--color-border);
 }
 
 .paper-links {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-sm);
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
 }
 
 .link-btn {
-    width: 40px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
     display: flex;
     align-items: center;
     justify-content: center;
     background: var(--color-bg-tertiary);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
-    font-size: 1.1rem;
+    font-size: 1rem;
     cursor: pointer;
     transition: all var(--transition-fast);
+    text-decoration: none;
 }
 
 .link-btn:hover {
@@ -1663,15 +1672,7 @@ a:hover {
     }
     
     .saved-paper-card {
-        flex-direction: column;
-    }
-    
-    .paper-sidebar {
-        flex-direction: row;
-    }
-    
-    .paper-links {
-        flex-direction: row;
+        padding: var(--space-md);
     }
     
     .stats-card {

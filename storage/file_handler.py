@@ -105,12 +105,12 @@ class FileHandler:
     
     def list_papers(self) -> List[Paper]:
         """
-        List all saved papers.
+        List all saved papers, sorted by save time (newest first).
         
         Returns:
             List of Paper objects
         """
-        papers = []
+        papers_with_saved_at = []
         
         for file_path in self.data_dir.glob("*.json"):
             try:
@@ -123,15 +123,22 @@ class FileHandler:
                 if data.get("updated"):
                     data["updated"] = datetime.fromisoformat(data["updated"])
                 
-                data.pop("saved_at", None)
-                papers.append(Paper(**data))
+                # Get saved_at for sorting, default to file modification time
+                saved_at = data.pop("saved_at", None)
+                if saved_at:
+                    saved_at = datetime.fromisoformat(saved_at)
+                else:
+                    # Fallback to file modification time
+                    saved_at = datetime.fromtimestamp(file_path.stat().st_mtime)
+                
+                papers_with_saved_at.append((Paper(**data), saved_at))
             except (json.JSONDecodeError, ValueError, KeyError):
                 continue
         
-        # Sort by published date (newest first)
-        papers.sort(key=lambda p: p.published, reverse=True)
+        # Sort by saved_at (newest first)
+        papers_with_saved_at.sort(key=lambda x: x[1], reverse=True)
         
-        return papers
+        return [paper for paper, _ in papers_with_saved_at]
     
     def list_paper_ids(self) -> List[str]:
         """

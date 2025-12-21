@@ -119,4 +119,6 @@ data/analysis/*.html
 data/analysis/*.txt
 !data/analysis/.gitkeep
 
+data/backups/
+
 ai_docs/

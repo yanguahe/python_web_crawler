@@ -1,8 +1,11 @@
 """
 Routes for managing saved papers.
 """
+import shutil
+import tarfile
+from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 from urllib.parse import unquote
 
 from fastapi import APIRouter, Request, HTTPException, Query
@@ -14,6 +17,21 @@ from storage import FileHandler
 from config import settings
 
 router = APIRouter(prefix="/papers", tags=["papers"])
+
+# Backup directory - use parent of data_dir (which is data/papers) to get data/
+DATA_ROOT = Path(settings.data_dir).parent  # This gives us "data/"
+BACKUP_DIR = DATA_ROOT / "backups"
+BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def get_backup_list() -> List[str]:
+    """Get list of backup files sorted by name (newest first)."""
+    backups = []
+    if BACKUP_DIR.exists():
+        for f in BACKUP_DIR.glob("*.tar.gz"):
+            backups.append(f.name)
+    backups.sort(reverse=True)
+    return backups
 
 # Setup templates
 APP_DIR = Path(__file__).resolve().parent.parent
@@ -43,13 +61,19 @@ async def list_saved_papers(request: Request):
         }
         papers_with_status.append(paper_dict)
     
+    # Get backup list
+    backups = get_backup_list()
+    latest_backup = backups[0] if backups else None
+    
     return templates.TemplateResponse(
         "papers.html",
         {
             "request": request,
             "title": "Saved Papers",
             "papers": papers_with_status,
-            "stats": stats
+            "stats": stats,
+            "backups": backups,
+            "latest_backup": latest_backup
         }
     )
 
@@ -75,6 +99,132 @@ async def api_get_stats() -> dict:
     API endpoint to get storage statistics.
     """
     return file_handler.get_stats()
+
+
+@router.post("/api/backup/create", tags=["api"])
+async def api_create_backup():
+    """
+    Create a backup of the entire data directory.
+    Copies the data/ directory (papers, pdfs, texts, analysis) to a timestamped folder 
+    and compresses it to .tar.gz
+    """
+    try:
+        # Generate timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        # Create temporary directory name
+        backup_name = f"data_backup_{timestamp}"
+        temp_backup_dir = BACKUP_DIR / backup_name
+        tar_filename = f"{backup_name}.tar.gz"
+        tar_path = BACKUP_DIR / tar_filename
+        
+        # Source is the entire data/ directory (DATA_ROOT)
+        source_dir = DATA_ROOT
+        
+        # Copy data directory to temp backup dir
+        # We exclude the backups directory to avoid recursive copying
+        if temp_backup_dir.exists():
+            shutil.rmtree(temp_backup_dir)
+        
+        # Create a copy, excluding the backups folder
+        temp_backup_dir.mkdir(parents=True, exist_ok=True)
+        for item in source_dir.iterdir():
+            if item.name == "backups":
+                continue  # Skip the backups directory
+            dest = temp_backup_dir / item.name
+            if item.is_dir():
+                shutil.copytree(item, dest)
+            else:
+                shutil.copy2(item, dest)
+        
+        # Create tar.gz file
+        with tarfile.open(tar_path, "w:gz") as tar:
+            tar.add(temp_backup_dir, arcname=backup_name)
+        
+        # Remove the temporary directory
+        shutil.rmtree(temp_backup_dir)
+        
+        # Get file size
+        file_size_mb = tar_path.stat().st_size / (1024 * 1024)
+        
+        return {
+            "success": True,
+            "filename": tar_filename,
+            "size_mb": round(file_size_mb, 2),
+            "path": str(tar_path)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create backup: {str(e)}")
+
+
+@router.get("/api/backup/list", tags=["api"])
+async def api_list_backups():
+    """
+    List all available backups.
+    """
+    backups = get_backup_list()
+    backup_info = []
+    
+    for backup_name in backups:
+        backup_path = BACKUP_DIR / backup_name
+        if backup_path.exists():
+            stat = backup_path.stat()
+            backup_info.append({
+                "filename": backup_name,
+                "size_mb": round(stat.st_size / (1024 * 1024), 2),
+                "created": datetime.fromtimestamp(stat.st_mtime).isoformat()
+            })
+    
+    return {
+        "success": True,
+        "backups": backup_info
+    }
+
+
+@router.get("/api/backup/download/{filename}", tags=["api"])
+async def api_download_backup(filename: str):
+    """
+    Download a backup file.
+    """
+    # Validate filename to prevent directory traversal
+    if "/" in filename or "\\" in filename or ".." in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    
+    if not filename.endswith(".tar.gz"):
+        raise HTTPException(status_code=400, detail="Invalid backup file format")
+    
+    backup_path = BACKUP_DIR / filename
+    
+    if not backup_path.exists():
+        raise HTTPException(status_code=404, detail="Backup file not found")
+    
+    return FileResponse(
+        path=str(backup_path),
+        filename=filename,
+        media_type="application/gzip"
+    )
+
+
+@router.delete("/api/backup/{filename}", tags=["api"])
+async def api_delete_backup(filename: str):
+    """
+    Delete a backup file.
+    """
+    # Validate filename to prevent directory traversal
+    if "/" in filename or "\\" in filename or ".." in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    
+    if not filename.endswith(".tar.gz"):
+        raise HTTPException(status_code=400, detail="Invalid backup file format")
+    
+    backup_path = BACKUP_DIR / filename
+    
+    if not backup_path.exists():
+        raise HTTPException(status_code=404, detail="Backup file not found")
+    
+    backup_path.unlink()
+    
+    return {"success": True, "message": f"Backup {filename} deleted"}
 
 
 @router.get("/api/pdf/{paper_id:path}", tags=["api"])

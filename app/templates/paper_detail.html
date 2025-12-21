@@ -294,14 +294,38 @@
 {% endblock %}
 
 {% block scripts %}
+<!-- Store data in hidden elements to avoid JavaScript parsing issues -->
+<script type="application/json" id="paper-title-data">{{ paper.title | tojson | safe }}</script>
+{% if text_content %}
+<script type="application/json" id="fulltext-data">{{ text_content | tojson | safe }}</script>
+{% endif %}
+
 <script>
 // Prompt persistence keys
 const PROMPT_STORAGE_KEY = 'arxiv_analysis_prompt';
 const FULLTEXT_PROMPT_STORAGE_KEY = 'arxiv_fulltext_analysis_prompt';
-const PAPER_TITLE = '{{ paper.title | e }}';
 
-// Store fulltext content for analysis
-const FULLTEXT_CONTENT = {{ text_content | tojson | safe if text_content else '""' }};
+// Safely parse data from hidden JSON elements
+let PAPER_TITLE = "";
+let FULLTEXT_CONTENT = "";
+
+try {
+    const titleEl = document.getElementById('paper-title-data');
+    if (titleEl) {
+        PAPER_TITLE = JSON.parse(titleEl.textContent);
+    }
+} catch (e) {
+    console.error('Error parsing paper title:', e);
+}
+
+try {
+    const fulltextEl = document.getElementById('fulltext-data');
+    if (fulltextEl) {
+        FULLTEXT_CONTENT = JSON.parse(fulltextEl.textContent);
+    }
+} catch (e) {
+    console.error('Error parsing fulltext content:', e);
+}
 
 document.addEventListener('DOMContentLoaded', async function() {
     // Restore abstract analysis prompt from localStorage
@@ -455,6 +479,10 @@ async function analyzeFulltextStream(paperId, title) {
     }
     
     const btn = document.querySelector(`button[data-fulltext-analyze-id="${paperId}"]`);
+    if (!btn) {
+        console.error('analyzeFulltextStream: button not found for paperId:', paperId);
+        return;
+    }
     const resultDiv = document.getElementById('fulltextAnalysisResult');
     const reasoningDiv = document.getElementById('fulltextAnalysisReasoning').querySelector('.reasoning-content');
     const contentDiv = document.getElementById('fulltextAnalysisContent').querySelector('.content-text');
@@ -611,13 +639,17 @@ async function deleteFulltextAnalysis(title) {
 
 async function savePaper(paperId) {
     const btn = document.querySelector(`button[data-paper-id="${paperId}"]`);
+    if (!btn) {
+        console.error('savePaper: button not found for paperId:', paperId);
+        return;
+    }
     const originalHTML = btn.innerHTML;
     
     btn.disabled = true;
     btn.innerHTML = '<span>⏳</span> Saving...';
     
     try {
-        const response = await fetch(`/papers/api/save/${encodeURIComponent(paperId)}`, {
+        const response = await fetch(`/papers/api/save/${paperId}`, {
             method: 'POST'
         });
         
@@ -670,13 +702,17 @@ async function deletePaper(paperId) {
 
 async function downloadToServer(paperId) {
     const btn = document.querySelector(`button[data-download-id="${paperId}"]`);
+    if (!btn) {
+        console.error('downloadToServer: button not found for paperId:', paperId);
+        return;
+    }
     const originalHTML = btn.innerHTML;
     
     btn.disabled = true;
     btn.innerHTML = '<span>⏳</span> Downloading...';
     
     try {
-        const response = await fetch(`/papers/api/download-pdf/${encodeURIComponent(paperId)}`, {
+        const response = await fetch(`/papers/api/download-pdf/${paperId}`, {
             method: 'POST'
         });
         
@@ -703,13 +739,17 @@ async function downloadToServer(paperId) {
 
 async function downloadToLocal(paperId, paperTitle) {
     const btn = document.querySelector(`button[data-local-download-id="${paperId}"]`);
+    if (!btn) {
+        console.error('downloadToLocal: button not found for paperId:', paperId);
+        return;
+    }
     const originalHTML = btn.innerHTML;
     
     btn.disabled = true;
     btn.innerHTML = '<span>⏳</span> Loading...';
     
     try {
-        let url = `/papers/api/pdf/${encodeURIComponent(paperId)}`;
+        let url = `/papers/api/pdf/${paperId}`;
         if (paperTitle) {
             url += `?title=${encodeURIComponent(paperTitle)}`;
         }
@@ -760,6 +800,10 @@ async function analyzePaperStream(paperId, title) {
     }
     
     const btn = document.querySelector(`button[data-analyze-id="${paperId}"]`);
+    if (!btn) {
+        console.error('analyzePaperStream: button not found for paperId:', paperId);
+        return;
+    }
     const resultDiv = document.getElementById('analysisResult');
     const reasoningDiv = document.getElementById('analysisReasoning').querySelector('.reasoning-content');
     const contentDiv = document.getElementById('analysisContent').querySelector('.content-text');

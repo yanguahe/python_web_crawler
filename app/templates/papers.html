@@ -33,13 +33,36 @@
             </div>
         </div>
     </div>
+    
+    <!-- Backup Actions -->
+    <div class="backup-section" style="display: flex; gap: 12px; margin-bottom: 20px; padding: 16px; background: rgba(88, 166, 255, 0.1); border-radius: 8px; border: 1px solid rgba(88, 166, 255, 0.2); align-items: center; flex-wrap: wrap;">
+        <span style="color: #8b949e; margin-right: 8px;">📦 Data Backup:</span>
+        <button id="backupBtn" onclick="createBackup()" class="action-btn primary" style="padding: 8px 16px;">
+            <span>💾</span> Create Backup
+        </button>
+        <span id="backupStatus" style="color: #8b949e; font-size: 0.9em;"></span>
+        {% if latest_backup %}
+        <a href="/papers/api/backup/download/{{ latest_backup }}" class="action-btn secondary" style="padding: 8px 16px; text-decoration: none;">
+            <span>⬇️</span> Download Latest ({{ latest_backup }})
+        </a>
+        {% endif %}
+        <select id="backupSelect" onchange="updateDownloadLink()" style="padding: 8px 12px; background: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; font-size: 0.9em;">
+            <option value="">-- Select Backup --</option>
+            {% for backup in backups %}
+            <option value="{{ backup }}">{{ backup }}</option>
+            {% endfor %}
+        </select>
+        <button id="downloadSelectedBtn" onclick="downloadSelectedBackup()" class="action-btn secondary" style="padding: 8px 16px;" disabled>
+            <span>⬇️</span> Download Selected
+        </button>
+    </div>
 
     {% if papers %}
     <!-- Papers List -->
     <div class="saved-papers-list">
         {% for item in papers %}
-        <article class="saved-paper-card" data-paper-id="{{ item.paper.id }}" data-paper-title="{{ item.paper.title | e }}">
-            <div class="paper-content">
+        <article class="saved-paper-card" data-paper-id="{{ item.paper.id }}" data-paper-title="{{ item.paper.title | e }}" style="display: flex; flex-direction: column;">
+            <div class="paper-content" style="width: 100%;">
                 <div class="paper-meta">
                     <div class="paper-categories">
                         {% for cat in item.paper.categories[:3] %}
@@ -60,59 +83,25 @@
                 </p>
             </div>
             
-            <div class="paper-sidebar">
-                <div class="paper-links">
-                    <!-- View on arXiv -->
-                    <a href="{{ item.paper.arxiv_url }}" target="_blank" class="link-btn" title="View on arXiv">
-                        📄
-                    </a>
-                    <!-- View PDF Online -->
-                    <a href="{{ item.paper.pdf_url }}" target="_blank" class="link-btn" title="View PDF Online">
-                        👁️
-                    </a>
-                    
-                    <!-- PDF/TXT Status and Actions -->
-                    {% if item.pdf_exists %}
-                    <!-- PDF exists on server - show download to local button -->
-                    <button class="link-btn downloaded" onclick="downloadToLocal('{{ item.paper.id }}', '{{ item.paper.title | e }}')" data-local-download-id="{{ item.paper.id }}" title="Download PDF to Local (已在服务器)">
-                        💾
-                    </button>
-                    <!-- Show PDF indicator -->
-                    <span class="link-btn status-indicator pdf-exists" title="PDF 已下载到服务器">
-                        📥
-                    </span>
-                    {% if item.text_exists %}
-                    <!-- Show TXT indicator -->
-                    <span class="link-btn status-indicator txt-exists" title="文本已提取">
-                        📝
-                    </span>
-                    {% endif %}
-                    <!-- Delete PDF/TXT button -->
-                    <button class="link-btn warning" onclick="deletePdfTxt('{{ item.paper.id }}', '{{ item.paper.title | e }}')" title="Delete PDF & Text">
-                        🗑️📄
-                    </button>
-                    {% else %}
-                    <!-- PDF not on server - show download to server button -->
-                    <button class="link-btn download" onclick="downloadToServer('{{ item.paper.id }}')" data-download-id="{{ item.paper.id }}" title="Download PDF & Extract Text (下载到服务器)">
-                        ⬇️
-                    </button>
-                    {% endif %}
-                    
-                    <!-- Analysis links -->
-                    {% if item.analysis_exists %}
-                    <a href="/analysis/view/{{ item.paper.title | urlencode }}_abstract_ds_analyze.html" target="_blank" class="link-btn analysis-link" title="View Analysis">
-                        🌐
-                    </a>
-                    <button class="link-btn warning" onclick="deleteAnalysis('{{ item.paper.title | e }}')" title="Delete Analysis">
-                        🧹
-                    </button>
-                    {% endif %}
-                    
-                    <!-- Delete Paper -->
-                    <button class="link-btn danger" onclick="deletePaper('{{ item.paper.id }}')" title="Delete Paper">
-                        🗑️
-                    </button>
-                </div>
+            <!-- Buttons in horizontal row below content -->
+            <div class="paper-actions-row" style="display: flex; flex-direction: row; flex-wrap: wrap; gap: 6px; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.1);">
+                <a href="{{ item.paper.arxiv_url }}" target="_blank" class="link-btn" title="View on arXiv">📄</a>
+                <a href="{{ item.paper.pdf_url }}" target="_blank" class="link-btn" title="View PDF Online">👁️</a>
+                {% if item.pdf_exists %}
+                <button class="link-btn downloaded" onclick="downloadToLocal('{{ item.paper.id }}', '{{ item.paper.title | e }}')" data-local-download-id="{{ item.paper.id }}" title="Download PDF to Local">💾</button>
+                <span class="link-btn status-indicator pdf-exists" title="PDF 已在服务器">📥</span>
+                {% if item.text_exists %}
+                <span class="link-btn status-indicator txt-exists" title="文本已提取">📝</span>
+                {% endif %}
+                <button class="link-btn warning" onclick="deletePdfTxt('{{ item.paper.id }}', '{{ item.paper.title | e }}')" title="Delete PDF & Text">🗑️📄</button>
+                {% else %}
+                <button class="link-btn download" onclick="downloadToServer('{{ item.paper.id }}')" data-download-id="{{ item.paper.id }}" title="Download PDF & Extract Text">⬇️</button>
+                {% endif %}
+                {% if item.analysis_exists %}
+                <a href="/analysis/view/{{ item.paper.title | urlencode }}_abstract_ds_analyze.html" target="_blank" class="link-btn analysis-link" title="View Analysis">🌐</a>
+                <button class="link-btn warning" onclick="deleteAnalysis('{{ item.paper.title | e }}')" title="Delete Analysis">🧹</button>
+                {% endif %}
+                <button class="link-btn danger" onclick="deletePaper('{{ item.paper.id }}')" title="Delete Paper">🗑️</button>
             </div>
         </article>
         {% endfor %}
@@ -243,6 +232,63 @@ async function deletePdfTxt(paperId, title) {
         alert('删除失败，请重试。');
     }
 }
+
+// ==================== Backup Functions ====================
+
+async function createBackup() {
+    const btn = document.getElementById('backupBtn');
+    const statusEl = document.getElementById('backupStatus');
+    const originalHTML = btn.innerHTML;
+    
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳</span> Creating...';
+    statusEl.textContent = 'Creating backup...';
+    
+    try {
+        const response = await fetch('/papers/api/backup/create', {
+            method: 'POST'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            btn.innerHTML = '<span>✅</span> Done!';
+            statusEl.textContent = `Backup created: ${data.filename}`;
+            statusEl.style.color = '#3fb950';
+            
+            // Reload page to show new backup in dropdown
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            throw new Error(data.detail || 'Failed to create backup');
+        }
+    } catch (error) {
+        console.error('Error creating backup:', error);
+        btn.innerHTML = '<span>❌</span> Error';
+        statusEl.textContent = 'Error: ' + error.message;
+        statusEl.style.color = '#f85149';
+        
+        setTimeout(() => {
+            btn.innerHTML = originalHTML;
+            btn.disabled = false;
+            statusEl.textContent = '';
+        }, 3000);
+    }
+}
+
+function updateDownloadLink() {
+    const select = document.getElementById('backupSelect');
+    const btn = document.getElementById('downloadSelectedBtn');
+    btn.disabled = !select.value;
+}
+
+function downloadSelectedBackup() {
+    const select = document.getElementById('backupSelect');
+    if (select.value) {
+        window.open(`/papers/api/backup/download/${select.value}`, '_blank');
+    }
+}
+
+// ==================== End Backup Functions ====================
 
 async function deleteAnalysis(title) {
     if (!confirm('确定要删除这篇论文的分析结果吗？')) {
