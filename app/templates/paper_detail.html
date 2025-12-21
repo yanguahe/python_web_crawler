@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="paper-detail-container">
+    <!-- Back Navigation -->
+    <a href="/papers" class="back-link">← Back to Saved Papers</a>
+    
+    <!-- Paper Header -->
+    <header class="paper-detail-header">
+        <div class="paper-categories">
+            {% for cat in paper.categories %}
+            <span class="category-tag">{{ cat }}</span>
+            {% endfor %}
+        </div>
+        
+        <h1 class="paper-detail-title">{{ paper.title }}</h1>
+        
+        <div class="paper-detail-meta">
+            <div class="meta-item">
+                <span class="meta-label">Authors</span>
+                <span class="meta-value">{{ paper.authors|join(', ') }}</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-label">Published</span>
+                <span class="meta-value">{{ paper.published.strftime('%B %d, %Y') }}</span>
+            </div>
+            {% if paper.updated %}
+            <div class="meta-item">
+                <span class="meta-label">Updated</span>
+                <span class="meta-value">{{ paper.updated.strftime('%B %d, %Y') }}</span>
+            </div>
+            {% endif %}
+            <div class="meta-item">
+                <span class="meta-label">arXiv ID</span>
+                <span class="meta-value">{{ paper.id }}</span>
+            </div>
+        </div>
+    </header>
+    
+    <!-- Action Buttons -->
+    <div class="paper-detail-actions">
+        <a href="{{ paper.arxiv_url }}" target="_blank" class="action-btn primary large">
+            <span>📄</span> View on arXiv
+        </a>
+        <a href="{{ paper.pdf_url }}" target="_blank" class="action-btn secondary large">
+            <span>👁️</span> View PDF
+        </a>
+        <button class="action-btn download-btn large" onclick="downloadPdf('{{ paper.id }}')" data-download-id="{{ paper.id }}">
+            <span>⬇️</span> Download PDF & Extract Text
+        </button>
+        <button class="action-btn text-btn large" onclick="viewText('{{ paper.id }}')" data-text-id="{{ paper.id }}">
+            <span>📝</span> View Extracted Text
+        </button>
+        <button class="action-btn danger large" onclick="deletePaper('{{ paper.id }}')">
+            <span>🗑️</span> Delete
+        </button>
+    </div>
+    
+    <!-- Abstract Section -->
+    <section class="paper-abstract-section">
+        <h2 class="section-title">Abstract</h2>
+        <div class="abstract-content">
+            <p>{{ paper.abstract }}</p>
+        </div>
+    </section>
+    
+    <!-- Paper Info Card -->
+    <section class="paper-info-section">
+        <h2 class="section-title">Paper Information</h2>
+        <div class="info-grid">
+            <div class="info-card">
+                <h4>arXiv URL</h4>
+                <a href="{{ paper.arxiv_url }}" target="_blank">{{ paper.arxiv_url }}</a>
+            </div>
+            <div class="info-card">
+                <h4>PDF URL</h4>
+                <a href="{{ paper.pdf_url }}" target="_blank">{{ paper.pdf_url }}</a>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function deletePaper(paperId) {
+    if (!confirm('Are you sure you want to delete this paper?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/papers/api/${paperId}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            window.location.href = '/papers';
+        } else {
+            throw new Error('Failed to delete');
+        }
+    } catch (error) {
+        console.error('Error deleting paper:', error);
+        alert('Failed to delete paper. Please try again.');
+    }
+}
+
+async function downloadPdf(paperId) {
+    const btn = document.querySelector(`button[data-download-id="${paperId}"]`);
+    const originalHTML = btn.innerHTML;
+    
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳</span> Downloading...';
+    
+    try {
+        const response = await fetch(`/papers/api/download-pdf/${paperId}`, {
+            method: 'POST'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            btn.innerHTML = '<span>✅</span> Downloaded!';
+            btn.classList.add('downloaded');
+            
+            // Enable the text button if text was extracted
+            if (data.text_extracted) {
+                const textBtn = document.querySelector(`button[data-text-id="${paperId}"]`);
+                if (textBtn) {
+                    textBtn.classList.add('available');
+                }
+            }
+            
+            // Open the PDF
+            window.open(`/papers/api/pdf/${paperId}`, '_blank');
+        } else {
+            throw new Error(data.detail || 'Failed to download');
+        }
+    } catch (error) {
+        console.error('Error downloading PDF:', error);
+        btn.innerHTML = '<span>❌</span> Error';
+        alert('Failed to download PDF: ' + error.message);
+        setTimeout(() => {
+            btn.innerHTML = originalHTML;
+            btn.disabled = false;
+        }, 2000);
+    }
+}
+
+async function viewText(paperId) {
+    const btn = document.querySelector(`button[data-text-id="${paperId}"]`);
+    
+    // Check if text exists
+    try {
+        const statusResponse = await fetch(`/papers/api/pdf-status/${paperId}`);
+        const statusData = await statusResponse.json();
+        
+        if (statusData.text_extracted) {
+            // Open text file in new tab
+            window.open(`/papers/api/text/${paperId}`, '_blank');
+        } else {
+            alert('Text not available. Please download the PDF first to extract text.');
+        }
+    } catch (error) {
+        console.error('Error checking text status:', error);
+        alert('Failed to check text availability.');
+    }
+}
+</script>
+{% endblock %}
+

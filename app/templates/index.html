@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="hero-section">
+    <div class="hero-content">
+        <h1 class="hero-title">
+            <span class="title-gradient">arXiv Paper Crawler</span>
+        </h1>
+        <p class="hero-subtitle">
+            Search and save academic paper abstracts from arXiv.org
+        </p>
+        
+        <!-- Search Form -->
+        <form action="/search" method="POST" class="search-form">
+            <div class="search-box">
+                <div class="search-input-wrapper">
+                    <span class="search-icon">🔍</span>
+                    <input 
+                        type="text" 
+                        name="query" 
+                        placeholder="Enter keywords, paper title, or author name..."
+                        class="search-input"
+                        required
+                        autofocus
+                    >
+                </div>
+                <button type="submit" class="search-button">
+                    Search Papers
+                </button>
+            </div>
+            
+            <div class="search-options">
+                <div class="option-group">
+                    <label for="max_results" class="option-label">Results:</label>
+                    <select name="max_results" id="max_results" class="option-select">
+                        <option value="5">5</option>
+                        <option value="10" selected>10</option>
+                        <option value="20">20</option>
+                        <option value="30">30</option>
+                        <option value="50">50</option>
+                    </select>
+                </div>
+                
+                <div class="option-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="save_results" value="true" class="checkbox-input">
+                        <span class="checkbox-custom"></span>
+                        <span class="checkbox-text">Auto-save results</span>
+                    </label>
+                </div>
+            </div>
+        </form>
+
+        <!-- Quick Search Tags -->
+        <div class="quick-tags">
+            <span class="tags-label">Popular searches:</span>
+            <div class="tags-list">
+                <button type="button" class="quick-tag" data-query="machine learning">Machine Learning</button>
+                <button type="button" class="quick-tag" data-query="deep learning">Deep Learning</button>
+                <button type="button" class="quick-tag" data-query="natural language processing">NLP</button>
+                <button type="button" class="quick-tag" data-query="computer vision">Computer Vision</button>
+                <button type="button" class="quick-tag" data-query="reinforcement learning">RL</button>
+                <button type="button" class="quick-tag" data-query="transformer">Transformer</button>
+                <button type="button" class="quick-tag" data-query="large language model">LLM</button>
+                <button type="button" class="quick-tag" data-query="diffusion model">Diffusion</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Decorative Background -->
+    <div class="hero-decoration">
+        <div class="decoration-circle circle-1"></div>
+        <div class="decoration-circle circle-2"></div>
+        <div class="decoration-circle circle-3"></div>
+    </div>
+</div>
+
+<!-- Features Section -->
+<section class="features-section">
+    <h2 class="section-title">Features</h2>
+    <div class="features-grid">
+        <div class="feature-card">
+            <span class="feature-icon">🔎</span>
+            <h3 class="feature-title">Smart Search</h3>
+            <p class="feature-desc">Search by keywords, authors, or paper titles across arXiv's vast collection</p>
+        </div>
+        <div class="feature-card">
+            <span class="feature-icon">💾</span>
+            <h3 class="feature-title">Save Abstracts</h3>
+            <p class="feature-desc">Save paper abstracts locally for offline reading and reference</p>
+        </div>
+        <div class="feature-card">
+            <span class="feature-icon">📊</span>
+            <h3 class="feature-title">RESTful API</h3>
+            <p class="feature-desc">Full API access for programmatic integration with your tools</p>
+        </div>
+        <div class="feature-card">
+            <span class="feature-icon">⚡</span>
+            <h3 class="feature-title">Fast & Reliable</h3>
+            <p class="feature-desc">Built with async Python for efficient, non-blocking requests</p>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Quick tag functionality
+    document.querySelectorAll('.quick-tag').forEach(tag => {
+        tag.addEventListener('click', function() {
+            const query = this.dataset.query;
+            document.querySelector('.search-input').value = query;
+            document.querySelector('.search-form').submit();
+        });
+    });
+</script>
+{% endblock %}
+

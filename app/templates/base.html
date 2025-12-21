@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ title }}{% endblock %} | arXiv Paper Crawler</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <div class="app-container">
+        <!-- Navigation -->
+        <nav class="navbar">
+            <div class="nav-content">
+                <a href="/" class="nav-brand">
+                    <span class="brand-icon">📚</span>
+                    <span class="brand-text">arXiv Crawler</span>
+                </a>
+                <div class="nav-links">
+                    <a href="/" class="nav-link {% if request.url.path == '/' %}active{% endif %}">
+                        <span class="nav-icon">🔍</span>
+                        Search
+                    </a>
+                    <a href="/papers" class="nav-link {% if '/papers' in request.url.path %}active{% endif %}">
+                        <span class="nav-icon">📄</span>
+                        Saved Papers
+                    </a>
+                    <a href="/docs" class="nav-link" target="_blank">
+                        <span class="nav-icon">📖</span>
+                        API Docs
+                    </a>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            {% block content %}{% endblock %}
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-content">
+                <p>Data sourced from <a href="https://arxiv.org/" target="_blank">arXiv.org</a></p>
+                <p class="footer-note">This application uses the arXiv API for searching papers. Please respect rate limits.</p>
+            </div>
+        </footer>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
+

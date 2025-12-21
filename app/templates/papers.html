@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="papers-container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="header-content">
+            <h1 class="page-title">📚 Saved Papers</h1>
+            <p class="page-subtitle">Your local collection of paper abstracts</p>
+        </div>
+        
+        <!-- Stats -->
+        <div class="stats-card">
+            <div class="stat-item">
+                <span class="stat-value">{{ stats.total_papers }}</span>
+                <span class="stat-label">Papers</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-value">{{ stats.total_pdfs }}</span>
+                <span class="stat-label">PDFs</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-value">{{ stats.total_texts }}</span>
+                <span class="stat-label">Texts</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-value">{{ stats.pdf_size_mb }} MB</span>
+                <span class="stat-label">PDF Size</span>
+            </div>
+        </div>
+    </div>
+
+    {% if papers %}
+    <!-- Papers List -->
+    <div class="saved-papers-list">
+        {% for paper in papers %}
+        <article class="saved-paper-card" data-paper-id="{{ paper.id }}">
+            <div class="paper-content">
+                <div class="paper-meta">
+                    <div class="paper-categories">
+                        {% for cat in paper.categories[:3] %}
+                        <span class="category-tag small">{{ cat }}</span>
+                        {% endfor %}
+                    </div>
+                    <span class="paper-date">{{ paper.published.strftime('%Y-%m-%d') }}</span>
+                </div>
+                
+                <h3 class="paper-title">
+                    <a href="/papers/{{ paper.id }}">{{ paper.title }}</a>
+                </h3>
+                
+                <p class="paper-authors">{{ paper.formatted_authors }}</p>
+                
+                <p class="paper-abstract-preview">
+                    {{ paper.abstract[:250] }}{% if paper.abstract|length > 250 %}...{% endif %}
+                </p>
+            </div>
+            
+            <div class="paper-sidebar">
+                <div class="paper-links">
+                    <a href="{{ paper.arxiv_url }}" target="_blank" class="link-btn" title="View on arXiv">
+                        📄
+                    </a>
+                    <a href="{{ paper.pdf_url }}" target="_blank" class="link-btn" title="View PDF Online">
+                        👁️
+                    </a>
+                    <button class="link-btn download" onclick="downloadPdf('{{ paper.id }}')" data-download-id="{{ paper.id }}" title="Download PDF to Local">
+                        ⬇️
+                    </button>
+                    <button class="link-btn danger" onclick="deletePaper('{{ paper.id }}')" title="Delete">
+                        🗑️
+                    </button>
+                </div>
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+    
+    {% else %}
+    <!-- Empty State -->
+    <div class="empty-state large">
+        <span class="empty-icon">📭</span>
+        <h2>No saved papers yet</h2>
+        <p>Search for papers and save them to build your collection</p>
+        <a href="/" class="empty-action">Start Searching</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function deletePaper(paperId) {
+    if (!confirm('Are you sure you want to delete this paper?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/papers/api/${paperId}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            // Remove the card from DOM
+            const card = document.querySelector(`[data-paper-id="${paperId}"]`);
+            card.style.animation = 'fadeOut 0.3s ease-out';
+            setTimeout(() => {
+                card.remove();
+                // Reload if no papers left
+                if (document.querySelectorAll('.saved-paper-card').length === 0) {
+                    location.reload();
+                }
+            }, 300);
+        } else {
+            throw new Error('Failed to delete');
+        }
+    } catch (error) {
+        console.error('Error deleting paper:', error);
+        alert('Failed to delete paper. Please try again.');
+    }
+}
+
+async function downloadPdf(paperId) {
+    const btn = document.querySelector(`button[data-download-id="${paperId}"]`);
+    const originalHTML = btn.innerHTML;
+    
+    btn.disabled = true;
+    btn.innerHTML = '⏳';
+    
+    try {
+        const response = await fetch(`/papers/api/download-pdf/${paperId}`, {
+            method: 'POST'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            btn.innerHTML = '✅';
+            btn.classList.add('downloaded');
+            
+            // Open the PDF
+            window.open(`/papers/api/pdf/${paperId}`, '_blank');
+        } else {
+            throw new Error(data.detail || 'Failed to download');
+        }
+    } catch (error) {
+        console.error('Error downloading PDF:', error);
+        btn.innerHTML = '❌';
+        setTimeout(() => {
+            btn.innerHTML = originalHTML;
+            btn.disabled = false;
+        }, 2000);
+    }
+}
+</script>
+{% endblock %}
+

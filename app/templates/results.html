@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="results-container">
+    <!-- Search Header -->
+    <div class="results-header">
+        <div class="results-info">
+            <a href="/" class="back-link">← Back to Search</a>
+            <h1 class="results-title">
+                {% if error %}
+                    Search Error
+                {% else %}
+                    Search Results
+                {% endif %}
+            </h1>
+            <p class="results-query">
+                Query: <strong>"{{ query }}"</strong>
+                {% if result %}
+                    | Found <strong>{{ result.total_results }}</strong> papers
+                {% endif %}
+            </p>
+        </div>
+        
+        <!-- New Search Form -->
+        <form action="/search" method="POST" class="inline-search">
+            <div class="inline-search-box">
+                <input 
+                    type="text" 
+                    name="query" 
+                    value="{{ query }}"
+                    placeholder="New search..."
+                    class="inline-search-input"
+                    required
+                >
+                <input type="hidden" name="max_results" value="{{ max_results or 10 }}">
+                <button type="submit" class="inline-search-btn">Search</button>
+            </div>
+        </form>
+    </div>
+
+    {% if error %}
+    <!-- Error Message -->
+    <div class="error-card">
+        <span class="error-icon">⚠️</span>
+        <div class="error-content">
+            <h3>Something went wrong</h3>
+            <p>{{ error }}</p>
+        </div>
+        <a href="/" class="error-action">Try Again</a>
+    </div>
+    
+    {% elif result and result.papers %}
+    
+    {% if saved_count > 0 %}
+    <!-- Save Notification -->
+    <div class="notification success">
+        <span class="notification-icon">✅</span>
+        <span class="notification-text">Successfully saved {{ saved_count }} papers to local storage</span>
+    </div>
+    {% endif %}
+
+    <!-- Results Grid -->
+    <div class="papers-grid">
+        {% for paper in result.papers %}
+        <article class="paper-card" data-paper-id="{{ paper.id }}">
+            <div class="paper-header">
+                <div class="paper-categories">
+                    {% for cat in paper.categories[:3] %}
+                    <span class="category-tag">{{ cat }}</span>
+                    {% endfor %}
+                </div>
+                <span class="paper-date">{{ paper.published.strftime('%Y-%m-%d') }}</span>
+            </div>
+            
+            <h3 class="paper-title">
+                <a href="{{ paper.arxiv_url }}" target="_blank" rel="noopener">
+                    {{ paper.title }}
+                </a>
+            </h3>
+            
+            <p class="paper-authors">{{ paper.formatted_authors }}</p>
+            
+            <div class="paper-abstract">
+                <p>{{ paper.abstract[:400] }}{% if paper.abstract|length > 400 %}...{% endif %}</p>
+            </div>
+            
+            <div class="paper-actions">
+                <a href="{{ paper.arxiv_url }}" target="_blank" class="action-btn primary">
+                    <span>📄</span> arXiv
+                </a>
+                <a href="{{ paper.pdf_url }}" target="_blank" class="action-btn secondary">
+                    <span>👁️</span> PDF
+                </a>
+                <button class="action-btn save-btn" onclick="savePaper('{{ paper.id }}')" data-paper-id="{{ paper.id }}">
+                    <span>💾</span> Save
+                </button>
+                <button class="action-btn download-btn" onclick="downloadPdf('{{ paper.id }}')" data-download-id="{{ paper.id }}">
+                    <span>⬇️</span> Download PDF
+                </button>
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+
+    <!-- Pagination -->
+    {% if result.has_more or result.start_index > 0 %}
+    <div class="pagination">
+        {% if result.start_index > 0 %}
+        <a href="/search?q={{ query }}&start={{ result.start_index - result.items_per_page }}&max_results={{ result.items_per_page }}" 
+           class="page-btn">
+            ← Previous
+        </a>
+        {% endif %}
+        
+        <span class="page-info">
+            Showing {{ result.start_index + 1 }} - {{ result.start_index + result.papers|length }} 
+            of {{ result.total_results }}
+        </span>
+        
+        {% if result.has_more %}
+        <a href="/search?q={{ query }}&start={{ result.start_index + result.items_per_page }}&max_results={{ result.items_per_page }}" 
+           class="page-btn">
+            Next →
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% else %}
+    <!-- No Results -->
+    <div class="empty-state">
+        <span class="empty-icon">🔍</span>
+        <h2>No papers found</h2>
+        <p>Try adjusting your search terms or using different keywords</p>
+        <a href="/" class="empty-action">New Search</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function savePaper(paperId) {
+    const btn = document.querySelector(`button[data-paper-id="${paperId}"]`);
+    const originalHTML = btn.innerHTML;
+    
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳</span> Saving...';
+    
+    try {
+        const response = await fetch(`/papers/api/save/${paperId}`, {
+            method: 'POST'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            btn.innerHTML = '<span>✅</span> Saved!';
+            btn.classList.add('saved');
+        } else {
+            throw new Error(data.detail || 'Failed to save');
+        }
+    } catch (error) {
+        console.error('Error saving paper:', error);
+        btn.innerHTML = '<span>❌</span> Error';
+        setTimeout(() => {
+            btn.innerHTML = originalHTML;
+            btn.disabled = false;
+        }, 2000);
+    }
+}
+
+async function downloadPdf(paperId) {
+    const btn = document.querySelector(`button[data-download-id="${paperId}"]`);
+    const originalHTML = btn.innerHTML;
+    
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳</span> Downloading...';
+    
+    try {
+        // First, download the PDF to server
+        const response = await fetch(`/papers/api/download-pdf/${paperId}`, {
+            method: 'POST'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            btn.innerHTML = '<span>✅</span> Downloaded!';
+            btn.classList.add('downloaded');
+            
+            // Open the PDF in a new tab or trigger download
+            window.open(`/papers/api/pdf/${paperId}`, '_blank');
+        } else {
+            throw new Error(data.detail || 'Failed to download');
+        }
+    } catch (error) {
+        console.error('Error downloading PDF:', error);
+        btn.innerHTML = '<span>❌</span> Error';
+        setTimeout(() => {
+            btn.innerHTML = originalHTML;
+            btn.disabled = false;
+        }, 2000);
+    }
+}
+</script>
+{% endblock %}
+
