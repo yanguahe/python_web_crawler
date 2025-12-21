@@ -20,6 +20,12 @@ class Settings(BaseSettings):
     arxiv_max_results: int = 10
     arxiv_rate_limit_delay: float = 3.0  # seconds between requests
     
+    # DeepSeek API Settings
+    deepseek_api_key: str = ""
+    deepseek_api_base_url: str = "https://api.deepseek.com"
+    deepseek_model: str = "deepseek-reasoner"
+    deepseek_max_tokens: int = 65536  # 64K - DeepSeek max supported
+    
     # Storage Settings
     data_dir: str = "data/papers"
     

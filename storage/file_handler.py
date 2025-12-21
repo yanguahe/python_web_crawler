@@ -187,6 +187,7 @@ class FileHandler:
         paper_files = list(self.data_dir.glob("*.json"))
         pdf_files = list(self.pdf_dir.glob("*.pdf"))
         text_files = list(self.text_dir.glob("*.txt"))
+        analysis_files = list(self.analysis_dir.glob("*.html"))
         total_size = sum(f.stat().st_size for f in paper_files)
         pdf_size = sum(f.stat().st_size for f in pdf_files)
         text_size = sum(f.stat().st_size for f in text_files)
@@ -195,6 +196,7 @@ class FileHandler:
             "total_papers": len(paper_files),
             "total_pdfs": len(pdf_files),
             "total_texts": len(text_files),
+            "total_analyses": len(analysis_files),
             "total_size_bytes": total_size,
             "total_size_mb": round(total_size / (1024 * 1024), 2),
             "pdf_size_mb": round(pdf_size / (1024 * 1024), 2),
@@ -215,6 +217,13 @@ class FileHandler:
         text_path = self.data_dir.parent / "texts"
         text_path.mkdir(parents=True, exist_ok=True)
         return text_path
+    
+    @property
+    def analysis_dir(self) -> Path:
+        """Get the analysis HTML files storage directory."""
+        analysis_path = self.data_dir.parent / "analysis"
+        analysis_path.mkdir(parents=True, exist_ok=True)
+        return analysis_path
     
     def _sanitize_filename(self, title: str, max_length: int = 100) -> str:
         """
@@ -428,6 +437,221 @@ class FileHandler:
         text_path = self.text_dir / f"{safe_id}.txt"
         if text_path.exists():
             text_path.unlink()
+        
+        return deleted
+    
+    # ==================== Analysis HTML Methods ====================
+    
+    def _get_analysis_filename(self, title: str) -> str:
+        """Generate analysis HTML filename from paper title."""
+        safe_title = self._sanitize_filename(title, max_length=80)
+        return f"{safe_title}_abstract_ds_analyze.html"
+    
+    def _get_analysis_path(self, title: str) -> Path:
+        """Get the file path for an analysis HTML file."""
+        filename = self._get_analysis_filename(title)
+        return self.analysis_dir / filename
+    
+    def save_analysis_html(self, title: str, html_content: str) -> str:
+        """
+        Save analysis result as HTML file.
+        
+        Args:
+            title: Paper title (used for filename)
+            html_content: HTML content from DeepSeek
+        
+        Returns:
+            Path to the saved file
+        """
+        file_path = self._get_analysis_path(title)
+        
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(html_content)
+        
+        return str(file_path)
+    
+    def get_analysis_path(self, title: str) -> Optional[Path]:
+        """Get the path to an analysis HTML file if it exists."""
+        file_path = self._get_analysis_path(title)
+        return file_path if file_path.exists() else None
+    
+    def analysis_exists(self, title: str) -> bool:
+        """Check if analysis HTML file exists."""
+        return self._get_analysis_path(title).exists()
+    
+    def get_analysis_content(self, title: str) -> Optional[str]:
+        """Get the analysis HTML content."""
+        file_path = self.get_analysis_path(title)
+        if file_path:
+            with open(file_path, "r", encoding="utf-8") as f:
+                return f.read()
+        return None
+    
+    def delete_analysis(self, title: str) -> bool:
+        """Delete an analysis HTML file and its reasoning file."""
+        deleted = False
+        
+        # Delete HTML file
+        file_path = self._get_analysis_path(title)
+        if file_path.exists():
+            file_path.unlink()
+            deleted = True
+        
+        # Delete reasoning file
+        reasoning_path = self._get_reasoning_path(title)
+        if reasoning_path.exists():
+            reasoning_path.unlink()
+            deleted = True
+        
+        return deleted
+    
+    # ==================== Reasoning Content Methods ====================
+    
+    def _get_reasoning_filename(self, title: str) -> str:
+        """Generate reasoning filename from paper title."""
+        safe_title = self._sanitize_filename(title, max_length=80)
+        return f"{safe_title}_abstract_ds_reasoning.txt"
+    
+    def _get_reasoning_path(self, title: str) -> Path:
+        """Get the file path for a reasoning file."""
+        filename = self._get_reasoning_filename(title)
+        return self.analysis_dir / filename
+    
+    def save_reasoning(self, title: str, reasoning_content: str) -> str:
+        """
+        Save reasoning content to file.
+        
+        Args:
+            title: Paper title (used for filename)
+            reasoning_content: Reasoning content from DeepSeek
+        
+        Returns:
+            Path to the saved file
+        """
+        file_path = self._get_reasoning_path(title)
+        
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(reasoning_content)
+        
+        return str(file_path)
+    
+    def get_reasoning_path(self, title: str) -> Optional[Path]:
+        """Get the path to a reasoning file if it exists."""
+        file_path = self._get_reasoning_path(title)
+        return file_path if file_path.exists() else None
+    
+    def reasoning_exists(self, title: str) -> bool:
+        """Check if reasoning file exists."""
+        return self._get_reasoning_path(title).exists()
+    
+    def get_reasoning_content(self, title: str) -> Optional[str]:
+        """Get the reasoning content."""
+        file_path = self.get_reasoning_path(title)
+        if file_path:
+            with open(file_path, "r", encoding="utf-8") as f:
+                return f.read()
+        return None
+    
+    def list_analyses(self) -> List[dict]:
+        """List all saved analysis files."""
+        analyses = []
+        for file_path in self.analysis_dir.glob("*_abstract_ds_analyze.html"):
+            analyses.append({
+                "filename": file_path.name,
+                "title": file_path.stem.replace("_abstract_ds_analyze", ""),
+                "path": str(file_path),
+                "size": file_path.stat().st_size,
+                "modified": datetime.fromtimestamp(file_path.stat().st_mtime).isoformat()
+            })
+        # Sort by modification time (newest first)
+        analyses.sort(key=lambda x: x['modified'], reverse=True)
+        return analyses
+    
+    # ==================== Fulltext Analysis Methods ====================
+    
+    def _get_fulltext_analysis_filename(self, title: str) -> str:
+        """Generate fulltext analysis HTML filename from paper title."""
+        safe_title = self._sanitize_filename(title, max_length=80)
+        return f"{safe_title}_fulltext_ds_analyze.html"
+    
+    def _get_fulltext_analysis_path(self, title: str) -> Path:
+        """Get the file path for a fulltext analysis HTML file."""
+        filename = self._get_fulltext_analysis_filename(title)
+        return self.analysis_dir / filename
+    
+    def _get_fulltext_reasoning_filename(self, title: str) -> str:
+        """Generate fulltext reasoning filename from paper title."""
+        safe_title = self._sanitize_filename(title, max_length=80)
+        return f"{safe_title}_fulltext_ds_reasoning.txt"
+    
+    def _get_fulltext_reasoning_path(self, title: str) -> Path:
+        """Get the file path for a fulltext reasoning file."""
+        filename = self._get_fulltext_reasoning_filename(title)
+        return self.analysis_dir / filename
+    
+    def save_fulltext_analysis_html(self, title: str, html_content: str) -> str:
+        """Save fulltext analysis result as HTML file."""
+        file_path = self._get_fulltext_analysis_path(title)
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(html_content)
+        return str(file_path)
+    
+    def save_fulltext_reasoning(self, title: str, reasoning_content: str) -> str:
+        """Save fulltext reasoning content to file."""
+        file_path = self._get_fulltext_reasoning_path(title)
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(reasoning_content)
+        return str(file_path)
+    
+    def get_fulltext_analysis_path(self, title: str) -> Optional[Path]:
+        """Get the path to a fulltext analysis HTML file if it exists."""
+        file_path = self._get_fulltext_analysis_path(title)
+        return file_path if file_path.exists() else None
+    
+    def get_fulltext_reasoning_path(self, title: str) -> Optional[Path]:
+        """Get the path to a fulltext reasoning file if it exists."""
+        file_path = self._get_fulltext_reasoning_path(title)
+        return file_path if file_path.exists() else None
+    
+    def fulltext_analysis_exists(self, title: str) -> bool:
+        """Check if fulltext analysis HTML file exists."""
+        return self._get_fulltext_analysis_path(title).exists()
+    
+    def fulltext_reasoning_exists(self, title: str) -> bool:
+        """Check if fulltext reasoning file exists."""
+        return self._get_fulltext_reasoning_path(title).exists()
+    
+    def get_fulltext_analysis_content(self, title: str) -> Optional[str]:
+        """Get the fulltext analysis HTML content."""
+        file_path = self.get_fulltext_analysis_path(title)
+        if file_path:
+            with open(file_path, "r", encoding="utf-8") as f:
+                return f.read()
+        return None
+    
+    def get_fulltext_reasoning_content(self, title: str) -> Optional[str]:
+        """Get the fulltext reasoning content."""
+        file_path = self.get_fulltext_reasoning_path(title)
+        if file_path:
+            with open(file_path, "r", encoding="utf-8") as f:
+                return f.read()
+        return None
+    
+    def delete_fulltext_analysis(self, title: str) -> bool:
+        """Delete fulltext analysis HTML and reasoning files."""
+        deleted = False
+        
+        # Delete HTML file
+        html_path = self._get_fulltext_analysis_path(title)
+        if html_path.exists():
+            html_path.unlink()
+            deleted = True
+        
+        # Delete reasoning file
+        reasoning_path = self._get_fulltext_reasoning_path(title)
+        if reasoning_path.exists():
+            reasoning_path.unlink()
+            deleted = True
         
         return deleted
 

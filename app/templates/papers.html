@@ -24,6 +24,10 @@
                 <span class="stat-label">Texts</span>
             </div>
             <div class="stat-item">
+                <span class="stat-value">{{ stats.total_analyses }}</span>
+                <span class="stat-label">Analyses</span>
+            </div>
+            <div class="stat-item">
                 <span class="stat-value">{{ stats.pdf_size_mb }} MB</span>
                 <span class="stat-label">PDF Size</span>
             </div>
@@ -33,41 +37,79 @@
     {% if papers %}
     <!-- Papers List -->
     <div class="saved-papers-list">
-        {% for paper in papers %}
-        <article class="saved-paper-card" data-paper-id="{{ paper.id }}">
+        {% for item in papers %}
+        <article class="saved-paper-card" data-paper-id="{{ item.paper.id }}" data-paper-title="{{ item.paper.title | e }}">
             <div class="paper-content">
                 <div class="paper-meta">
                     <div class="paper-categories">
-                        {% for cat in paper.categories[:3] %}
+                        {% for cat in item.paper.categories[:3] %}
                         <span class="category-tag small">{{ cat }}</span>
                         {% endfor %}
                     </div>
-                    <span class="paper-date">{{ paper.published.strftime('%Y-%m-%d') }}</span>
+                    <span class="paper-date">{{ item.paper.published.strftime('%Y-%m-%d') }}</span>
                 </div>
                 
                 <h3 class="paper-title">
-                    <a href="/papers/{{ paper.id }}">{{ paper.title }}</a>
+                    <a href="/papers/{{ item.paper.id }}">{{ item.paper.title }}</a>
                 </h3>
                 
-                <p class="paper-authors">{{ paper.formatted_authors }}</p>
+                <p class="paper-authors">{{ item.paper.formatted_authors }}</p>
                 
                 <p class="paper-abstract-preview">
-                    {{ paper.abstract[:250] }}{% if paper.abstract|length > 250 %}...{% endif %}
+                    {{ item.paper.abstract[:250] }}{% if item.paper.abstract|length > 250 %}...{% endif %}
                 </p>
             </div>
             
             <div class="paper-sidebar">
                 <div class="paper-links">
-                    <a href="{{ paper.arxiv_url }}" target="_blank" class="link-btn" title="View on arXiv">
+                    <!-- View on arXiv -->
+                    <a href="{{ item.paper.arxiv_url }}" target="_blank" class="link-btn" title="View on arXiv">
                         📄
                     </a>
-                    <a href="{{ paper.pdf_url }}" target="_blank" class="link-btn" title="View PDF Online">
+                    <!-- View PDF Online -->
+                    <a href="{{ item.paper.pdf_url }}" target="_blank" class="link-btn" title="View PDF Online">
                         👁️
                     </a>
-                    <button class="link-btn download" onclick="downloadPdf('{{ paper.id }}')" data-download-id="{{ paper.id }}" title="Download PDF to Local">
+                    
+                    <!-- PDF/TXT Status and Actions -->
+                    {% if item.pdf_exists %}
+                    <!-- PDF exists on server - show download to local button -->
+                    <button class="link-btn downloaded" onclick="downloadToLocal('{{ item.paper.id }}', '{{ item.paper.title | e }}')" data-local-download-id="{{ item.paper.id }}" title="Download PDF to Local (已在服务器)">
+                        💾
+                    </button>
+                    <!-- Show PDF indicator -->
+                    <span class="link-btn status-indicator pdf-exists" title="PDF 已下载到服务器">
+                        📥
+                    </span>
+                    {% if item.text_exists %}
+                    <!-- Show TXT indicator -->
+                    <span class="link-btn status-indicator txt-exists" title="文本已提取">
+                        📝
+                    </span>
+                    {% endif %}
+                    <!-- Delete PDF/TXT button -->
+                    <button class="link-btn warning" onclick="deletePdfTxt('{{ item.paper.id }}', '{{ item.paper.title | e }}')" title="Delete PDF & Text">
+                        🗑️📄
+                    </button>
+                    {% else %}
+                    <!-- PDF not on server - show download to server button -->
+                    <button class="link-btn download" onclick="downloadToServer('{{ item.paper.id }}')" data-download-id="{{ item.paper.id }}" title="Download PDF & Extract Text (下载到服务器)">
                         ⬇️
                     </button>
-                    <button class="link-btn danger" onclick="deletePaper('{{ paper.id }}')" title="Delete">
+                    {% endif %}
+                    
+                    <!-- Analysis links -->
+                    {% if item.analysis_exists %}
+                    <a href="/analysis/view/{{ item.paper.title | urlencode }}_abstract_ds_analyze.html" target="_blank" class="link-btn analysis-link" title="View Analysis">
+                        🌐
+                    </a>
+                    <button class="link-btn warning" onclick="deleteAnalysis('{{ item.paper.title | e }}')" title="Delete Analysis">
+                        🧹
+                    </button>
+                    {% endif %}
+                    
+                    <!-- Delete Paper -->
+                    <button class="link-btn danger" onclick="deletePaper('{{ item.paper.id }}')" title="Delete Paper">
                         🗑️
                     </button>
                 </div>
@@ -91,12 +133,12 @@
 {% block scripts %}
 <script>
 async function deletePaper(paperId) {
-    if (!confirm('Are you sure you want to delete this paper?')) {
+    if (!confirm('确定要删除这篇论文吗？（PDF、文本、分析结果也会被删除）')) {
         return;
     }
     
     try {
-        const response = await fetch(`/papers/api/${paperId}`, {
+        const response = await fetch(`/papers/api/${encodeURIComponent(paperId)}`, {
             method: 'DELETE'
         });
         
@@ -116,11 +158,11 @@ async function deletePaper(paperId) {
         }
     } catch (error) {
         console.error('Error deleting paper:', error);
-        alert('Failed to delete paper. Please try again.');
+        alert('删除失败，请重试。');
     }
 }
 
-async function downloadPdf(paperId) {
+async function downloadToServer(paperId) {
     const btn = document.querySelector(`button[data-download-id="${paperId}"]`);
     const originalHTML = btn.innerHTML;
     
@@ -128,7 +170,7 @@ async function downloadPdf(paperId) {
     btn.innerHTML = '⏳';
     
     try {
-        const response = await fetch(`/papers/api/download-pdf/${paperId}`, {
+        const response = await fetch(`/papers/api/download-pdf/${encodeURIComponent(paperId)}`, {
             method: 'POST'
         });
         
@@ -137,21 +179,91 @@ async function downloadPdf(paperId) {
         if (data.success) {
             btn.innerHTML = '✅';
             btn.classList.add('downloaded');
-            
-            // Open the PDF
-            window.open(`/papers/api/pdf/${paperId}`, '_blank');
+            alert('PDF 已下载到服务器并提取文本！刷新页面查看。');
+            location.reload();
         } else {
             throw new Error(data.detail || 'Failed to download');
         }
     } catch (error) {
         console.error('Error downloading PDF:', error);
         btn.innerHTML = '❌';
+        alert('下载失败: ' + error.message);
         setTimeout(() => {
             btn.innerHTML = originalHTML;
             btn.disabled = false;
         }, 2000);
     }
 }
+
+async function downloadToLocal(paperId, paperTitle) {
+    const btn = document.querySelector(`button[data-local-download-id="${paperId}"]`);
+    const originalHTML = btn.innerHTML;
+    
+    btn.disabled = true;
+    btn.innerHTML = '⏳';
+    
+    try {
+        // Directly open the PDF from server, passing title for lookup
+        let url = `/papers/api/pdf/${encodeURIComponent(paperId)}`;
+        if (paperTitle) {
+            url += `?title=${encodeURIComponent(paperTitle)}`;
+        }
+        window.open(url, '_blank');
+        btn.innerHTML = originalHTML;
+        btn.disabled = false;
+    } catch (error) {
+        console.error('Error downloading PDF to local:', error);
+        btn.innerHTML = '❌';
+        alert('下载到本地失败: ' + error.message);
+        setTimeout(() => {
+            btn.innerHTML = originalHTML;
+            btn.disabled = false;
+        }, 2000);
+    }
+}
+
+async function deletePdfTxt(paperId, title) {
+    if (!confirm('确定要删除这篇论文的 PDF 和文本文件吗？')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/papers/api/pdf/${encodeURIComponent(paperId)}?title=${encodeURIComponent(title)}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            alert('PDF 和文本文件已删除！');
+            location.reload();
+        } else {
+            throw new Error('Failed to delete');
+        }
+    } catch (error) {
+        console.error('Error deleting PDF/TXT:', error);
+        alert('删除失败，请重试。');
+    }
+}
+
+async function deleteAnalysis(title) {
+    if (!confirm('确定要删除这篇论文的分析结果吗？')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/analysis/delete/${encodeURIComponent(title)}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            alert('分析结果已删除！');
+            location.reload();
+        } else {
+            throw new Error('Failed to delete analysis');
+        }
+    } catch (error) {
+        console.error('Error deleting analysis:', error);
+        alert('删除分析结果失败，请重试。');
+    }
+}
 </script>
 {% endblock %}
-

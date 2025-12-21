@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from config import settings
-from .routes import search_router, papers_router
+from .routes import search_router, papers_router, analysis_router
 
 # Get the app directory
 APP_DIR = Path(__file__).resolve().parent
@@ -33,6 +33,7 @@ def create_app() -> FastAPI:
     # Include routers
     application.include_router(search_router)
     application.include_router(papers_router)
+    application.include_router(analysis_router)
     
     return application
 

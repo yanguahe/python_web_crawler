@@ -115,4 +115,8 @@ data/pdfs/*.pdf
 data/texts/*.txt
 !data/texts/.gitkeep
 
+data/analysis/*.html
+data/analysis/*.txt
+!data/analysis/.gitkeep
+
 ai_docs/

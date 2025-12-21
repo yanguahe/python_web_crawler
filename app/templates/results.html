@@ -59,6 +59,24 @@
     </div>
     {% endif %}
 
+    <!-- AI Analysis Prompt Section -->
+    <div class="analysis-prompt-section">
+        <div class="prompt-header">
+            <span class="prompt-icon">🤖</span>
+            <h3>AI Analysis (DeepSeek)</h3>
+            <span class="api-status" id="apiStatus">Checking...</span>
+        </div>
+        <div class="prompt-input-wrapper">
+            <textarea 
+                id="analysisPrompt" 
+                class="prompt-textarea"
+                placeholder="Enter your analysis prompt here... (e.g., 'Summarize the main contributions and identify potential limitations', 'What novel methods does this paper propose?', 'How does this relate to transformer architectures?')"
+                rows="3"
+            ></textarea>
+        </div>
+        <p class="prompt-hint">💡 This prompt will be used to analyze all selected papers' abstracts.</p>
+    </div>
+
     <!-- Results Grid -->
     <div class="papers-grid">
         {% for paper in result.papers %}
@@ -73,7 +91,7 @@
             </div>
             
             <h3 class="paper-title">
-                <a href="{{ paper.arxiv_url }}" target="_blank" rel="noopener">
+                <a href="/papers/view/{{ paper.id }}">
                     {{ paper.title }}
                 </a>
             </h3>
@@ -89,14 +107,51 @@
                     <span>📄</span> arXiv
                 </a>
                 <a href="{{ paper.pdf_url }}" target="_blank" class="action-btn secondary">
-                    <span>👁️</span> PDF
+                    <span>👁️</span> View PDF
                 </a>
                 <button class="action-btn save-btn" onclick="savePaper('{{ paper.id }}')" data-paper-id="{{ paper.id }}">
                     <span>💾</span> Save
                 </button>
-                <button class="action-btn download-btn" onclick="downloadPdf('{{ paper.id }}')" data-download-id="{{ paper.id }}">
-                    <span>⬇️</span> Download PDF
+                <!-- Download PDF to Server Button -->
+                <button class="action-btn download-btn" onclick="downloadPdfToServer('{{ paper.id }}', '{{ paper.title | e }}')" data-download-id="{{ paper.id }}" data-paper-title="{{ paper.title | e }}">
+                    <span>⬇️</span> Download PDF & Extract Text
                 </button>
+                <!-- PDF/TXT Status Indicators (hidden by default, shown via JS) -->
+                <span class="action-btn status-btn pdf-status" data-pdf-status-id="{{ paper.id }}" style="display: none;" title="PDF 已在服务器">
+                    <span>📥</span> PDF
+                </span>
+                <span class="action-btn status-btn txt-status" data-txt-status-id="{{ paper.id }}" style="display: none;" title="文本已提取">
+                    <span>📝</span> TXT
+                </span>
+                <!-- Delete PDF/TXT Button (hidden by default) -->
+                <button class="action-btn delete-pdf-btn" onclick="deletePdfTxt('{{ paper.id }}', '{{ paper.title | e }}')" data-delete-pdf-id="{{ paper.id }}" style="display: none;">
+                    <span>🗑️</span> Delete PDF/TXT
+                </button>
+                <button class="action-btn analyze-btn" onclick="analyzePaper('{{ paper.id }}', '{{ paper.title | e }}', `{{ paper.abstract | e }}`)" data-analyze-id="{{ paper.id }}">
+                    <span>🤖</span> Analyze
+                </button>
+                <a href="#" class="action-btn view-analysis-btn" data-title="{{ paper.title | e }}" style="display: none;" target="_blank">
+                    <span>🌐</span> View Analysis
+                </a>
+                <button class="action-btn delete-analysis-btn" onclick="deleteAnalysis('{{ paper.title | e }}')" data-analysis-title="{{ paper.title | e }}" style="display: none;">
+                    <span>🧹</span> Delete Analysis
+                </button>
+            </div>
+            
+            <!-- Analysis Result (hidden by default) -->
+            <div class="analysis-result" id="analysis-{{ paper.id }}" style="display: none;">
+                <div class="analysis-header">
+                    <span>🤖 AI Analysis</span>
+                    <button class="close-analysis" onclick="closeAnalysis('{{ paper.id }}')">&times;</button>
+                </div>
+                <div class="analysis-reasoning" id="reasoning-{{ paper.id }}">
+                    <h4>💭 Reasoning Process</h4>
+                    <div class="reasoning-content"></div>
+                </div>
+                <div class="analysis-content" id="content-{{ paper.id }}">
+                    <h4>📝 Analysis Result</h4>
+                    <div class="content-text"></div>
+                </div>
             </div>
         </article>
         {% endfor %}
@@ -140,6 +195,295 @@
 
 {% block scripts %}
 <script>
+// Prompt persistence key
+const PROMPT_STORAGE_KEY = 'arxiv_analysis_prompt';
+
+// Load and save prompt from/to localStorage
+document.addEventListener('DOMContentLoaded', async function() {
+    // Restore prompt from localStorage
+    const savedPrompt = localStorage.getItem(PROMPT_STORAGE_KEY);
+    const promptTextarea = document.getElementById('analysisPrompt');
+    if (savedPrompt && promptTextarea) {
+        promptTextarea.value = savedPrompt;
+    }
+    
+    // Save prompt to localStorage on change
+    if (promptTextarea) {
+        promptTextarea.addEventListener('input', function() {
+            localStorage.setItem(PROMPT_STORAGE_KEY, this.value);
+        });
+    }
+    
+    // Check API status
+    const statusEl = document.getElementById('apiStatus');
+    try {
+        const response = await fetch('/analysis/status');
+        const data = await response.json();
+        if (data.configured) {
+            statusEl.textContent = '✅ Ready';
+            statusEl.classList.add('status-ready');
+        } else {
+            statusEl.textContent = '⚠️ Not Configured';
+            statusEl.classList.add('status-error');
+            statusEl.title = data.message;
+        }
+    } catch (error) {
+        statusEl.textContent = '❌ Error';
+        statusEl.classList.add('status-error');
+    }
+    
+    // Check for existing analyses for each paper
+    checkExistingAnalyses();
+    
+    // Check PDF/TXT status for each paper
+    checkPdfStatus();
+});
+
+async function checkExistingAnalyses() {
+    const viewButtons = document.querySelectorAll('.view-analysis-btn');
+    
+    for (const btn of viewButtons) {
+        const title = btn.dataset.title;
+        if (!title) continue;
+        
+        try {
+            const response = await fetch(`/analysis/exists/${encodeURIComponent(title)}`);
+            const data = await response.json();
+            
+            if (data.exists && data.view_url) {
+                btn.href = data.view_url;
+                btn.style.display = 'inline-flex';
+                
+                // Also mark the analyze button as already analyzed and show delete button
+                const paperCard = btn.closest('.paper-card');
+                if (paperCard) {
+                    const analyzeBtn = paperCard.querySelector('.analyze-btn');
+                    if (analyzeBtn) {
+                        analyzeBtn.classList.add('has-analysis');
+                    }
+                    const deleteBtn = paperCard.querySelector('.delete-analysis-btn');
+                    if (deleteBtn) {
+                        deleteBtn.style.display = 'inline-flex';
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error checking analysis for:', title, error);
+        }
+    }
+}
+
+async function deleteAnalysis(title) {
+    if (!confirm('确定要删除这篇论文的分析结果吗？')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/analysis/delete/${encodeURIComponent(title)}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            // Hide the view and delete buttons
+            const deleteBtn = document.querySelector(`button[data-analysis-title="${title}"]`);
+            if (deleteBtn) {
+                const paperCard = deleteBtn.closest('.paper-card');
+                if (paperCard) {
+                    const viewBtn = paperCard.querySelector('.view-analysis-btn');
+                    if (viewBtn) {
+                        viewBtn.style.display = 'none';
+                    }
+                    const analyzeBtn = paperCard.querySelector('.analyze-btn');
+                    if (analyzeBtn) {
+                        analyzeBtn.classList.remove('has-analysis');
+                        analyzeBtn.classList.remove('analyzed');
+                        analyzeBtn.innerHTML = '<span>🤖</span> Analyze';
+                        analyzeBtn.disabled = false;
+                    }
+                    // Hide the analysis result section
+                    const analysisResult = paperCard.querySelector('.analysis-result');
+                    if (analysisResult) {
+                        analysisResult.style.display = 'none';
+                    }
+                }
+                deleteBtn.style.display = 'none';
+            }
+            alert('分析结果已删除。');
+        } else {
+            throw new Error('Failed to delete analysis');
+        }
+    } catch (error) {
+        console.error('Error deleting analysis:', error);
+        alert('删除分析结果失败，请重试。');
+    }
+}
+
+async function analyzePaper(paperId, title, abstract) {
+    const prompt = document.getElementById('analysisPrompt').value.trim();
+    
+    if (!prompt) {
+        alert('请先输入分析提示词。');
+        document.getElementById('analysisPrompt').focus();
+        return;
+    }
+    
+    const btn = document.querySelector(`button[data-analyze-id="${paperId}"]`);
+    const resultDiv = document.getElementById(`analysis-${paperId}`);
+    const reasoningDiv = document.getElementById(`reasoning-${paperId}`).querySelector('.reasoning-content');
+    const contentDiv = document.getElementById(`content-${paperId}`).querySelector('.content-text');
+    const originalHTML = btn.innerHTML;
+    
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳</span> Analyzing...';
+    
+    // Clear previous results and show container
+    reasoningDiv.innerHTML = '<span class="cursor-blink">▌</span>';
+    contentDiv.innerHTML = '<div class="loading">Waiting for analysis...</div>';
+    resultDiv.style.display = 'block';
+    
+    let reasoningBuffer = '';
+    let contentBuffer = '';
+    let sseBuffer = '';
+    let isContentPhase = false;
+    
+    try {
+        const response = await fetch('/analysis/analyze/stream', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'text/event-stream'
+            },
+            body: JSON.stringify({
+                paper_id: paperId,
+                title: title,
+                abstract: abstract,
+                prompt: prompt
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            const chunk = decoder.decode(value, { stream: true });
+            sseBuffer += chunk;
+            
+            // Process complete SSE messages (ending with \n\n)
+            const messages = sseBuffer.split('\n\n');
+            sseBuffer = messages.pop() || '';
+            
+            for (const message of messages) {
+                const lines = message.split('\n');
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.substring(6));
+                            
+                            if (data.type === 'reasoning') {
+                                reasoningBuffer += data.content;
+                                reasoningDiv.innerHTML = formatMarkdown(reasoningBuffer) + '<span class="cursor-blink">▌</span>';
+                                reasoningDiv.scrollTop = reasoningDiv.scrollHeight;
+                            } else if (data.type === 'content') {
+                                if (!isContentPhase) {
+                                    isContentPhase = true;
+                                    reasoningDiv.innerHTML = formatMarkdown(reasoningBuffer);
+                                    contentDiv.innerHTML = '';
+                                }
+                                contentBuffer += data.content;
+                                contentDiv.innerHTML = `<div class="analysis-preview"><pre class="html-stream" id="htmlStream-${paperId}">${escapeHtml(contentBuffer)}<span class="cursor-blink">▌</span></pre></div>`;
+                                const preEl = document.getElementById(`htmlStream-${paperId}`);
+                                if (preEl) {
+                                    preEl.scrollTop = preEl.scrollHeight;
+                                }
+                            } else if (data.type === 'done') {
+                                btn.innerHTML = '<span>✅</span> Analyzed';
+                                btn.classList.add('analyzed');
+                                
+                                if (!isContentPhase) {
+                                    reasoningDiv.innerHTML = formatMarkdown(reasoningBuffer);
+                                }
+                                
+                                // Update content display
+                                if (data.html_saved && data.view_url) {
+                                    contentDiv.innerHTML = `
+                                        <div class="analysis-actions">
+                                            <a href="${data.view_url}" target="_blank" class="view-html-btn">
+                                                <span>🌐</span> View Full HTML Analysis
+                                            </a>
+                                        </div>
+                                        <div class="analysis-preview"><em>HTML 分析报告已生成，点击上方按钮查看完整内容</em></div>
+                                    `;
+                                    
+                                    // Show view/delete buttons in paper-actions
+                                    const paperCard = btn.closest('.paper-card');
+                                    if (paperCard) {
+                                        const viewBtn = paperCard.querySelector('.view-analysis-btn');
+                                        if (viewBtn) {
+                                            viewBtn.href = data.view_url;
+                                            viewBtn.style.display = 'inline-flex';
+                                        }
+                                        const deleteBtn = paperCard.querySelector('.delete-analysis-btn');
+                                        if (deleteBtn) {
+                                            deleteBtn.style.display = 'inline-flex';
+                                        }
+                                    }
+                                } else {
+                                    contentDiv.innerHTML = `<div class="analysis-preview"><pre class="html-stream">${escapeHtml(contentBuffer)}</pre></div>`;
+                                }
+                            }
+                        } catch (e) {
+                            console.debug('Invalid SSE JSON:', line);
+                        }
+                    }
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error analyzing paper:', error);
+        btn.innerHTML = '<span>❌</span> Error';
+        reasoningDiv.innerHTML = reasoningBuffer || '';
+        contentDiv.innerHTML = `<div class="error-text">Error: ${error.message}</div>`;
+        
+        setTimeout(() => {
+            btn.innerHTML = originalHTML;
+            btn.disabled = false;
+        }, 3000);
+    }
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function closeAnalysis(paperId) {
+    document.getElementById(`analysis-${paperId}`).style.display = 'none';
+    const btn = document.querySelector(`button[data-analyze-id="${paperId}"]`);
+    btn.innerHTML = '<span>🤖</span> Analyze';
+    btn.disabled = false;
+    btn.classList.remove('analyzed');
+}
+
+function formatMarkdown(text) {
+    // Basic markdown formatting
+    return text
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/`(.*?)`/g, '<code>$1</code>')
+        .replace(/\n/g, '<br>')
+        .replace(/^### (.*?)$/gm, '<h5>$1</h5>')
+        .replace(/^## (.*?)$/gm, '<h4>$1</h4>')
+        .replace(/^# (.*?)$/gm, '<h3>$1</h3>');
+}
+
 async function savePaper(paperId) {
     const btn = document.querySelector(`button[data-paper-id="${paperId}"]`);
     const originalHTML = btn.innerHTML;
@@ -170,7 +514,58 @@ async function savePaper(paperId) {
     }
 }
 
-async function downloadPdf(paperId) {
+async function checkPdfStatus() {
+    const downloadButtons = document.querySelectorAll('.download-btn');
+    
+    for (const btn of downloadButtons) {
+        const paperId = btn.dataset.downloadId;
+        const paperTitle = btn.dataset.paperTitle;
+        if (!paperId) continue;
+        
+        try {
+            let url = `/papers/api/pdf-status/${encodeURIComponent(paperId)}`;
+            if (paperTitle) {
+                url += `?title=${encodeURIComponent(paperTitle)}`;
+            }
+            const response = await fetch(url);
+            const data = await response.json();
+            
+            const paperCard = btn.closest('.paper-card');
+            if (!paperCard) continue;
+            
+            if (data.downloaded) {
+                // PDF exists on server - update UI
+                btn.innerHTML = '<span>✅</span> PDF on Server';
+                btn.classList.add('downloaded');
+                btn.disabled = true;
+                
+                // Show PDF status indicator
+                const pdfStatus = paperCard.querySelector('.pdf-status');
+                if (pdfStatus) {
+                    pdfStatus.style.display = 'inline-flex';
+                }
+                
+                // Show TXT status indicator if text was extracted
+                if (data.text_extracted) {
+                    const txtStatus = paperCard.querySelector('.txt-status');
+                    if (txtStatus) {
+                        txtStatus.style.display = 'inline-flex';
+                    }
+                }
+                
+                // Show delete button
+                const deleteBtn = paperCard.querySelector('.delete-pdf-btn');
+                if (deleteBtn) {
+                    deleteBtn.style.display = 'inline-flex';
+                }
+            }
+        } catch (error) {
+            console.error('Error checking PDF status for:', paperId, error);
+        }
+    }
+}
+
+async function downloadPdfToServer(paperId, paperTitle) {
     const btn = document.querySelector(`button[data-download-id="${paperId}"]`);
     const originalHTML = btn.innerHTML;
     
@@ -178,29 +573,98 @@ async function downloadPdf(paperId) {
     btn.innerHTML = '<span>⏳</span> Downloading...';
     
     try {
-        // First, download the PDF to server
-        const response = await fetch(`/papers/api/download-pdf/${paperId}`, {
+        // Download the PDF to server
+        const response = await fetch(`/papers/api/download-pdf/${encodeURIComponent(paperId)}`, {
             method: 'POST'
         });
         
         const data = await response.json();
         
         if (data.success) {
-            btn.innerHTML = '<span>✅</span> Downloaded!';
+            btn.innerHTML = '<span>✅</span> PDF on Server';
             btn.classList.add('downloaded');
             
-            // Open the PDF in a new tab or trigger download
-            window.open(`/papers/api/pdf/${paperId}`, '_blank');
+            // Show status indicators
+            const paperCard = btn.closest('.paper-card');
+            if (paperCard) {
+                const pdfStatus = paperCard.querySelector('.pdf-status');
+                if (pdfStatus) {
+                    pdfStatus.style.display = 'inline-flex';
+                }
+                
+                if (data.text_extracted) {
+                    const txtStatus = paperCard.querySelector('.txt-status');
+                    if (txtStatus) {
+                        txtStatus.style.display = 'inline-flex';
+                    }
+                }
+                
+                const deleteBtn = paperCard.querySelector('.delete-pdf-btn');
+                if (deleteBtn) {
+                    deleteBtn.style.display = 'inline-flex';
+                }
+            }
+            
+            alert('PDF 已下载到服务器并提取文本！');
         } else {
             throw new Error(data.detail || 'Failed to download');
         }
     } catch (error) {
         console.error('Error downloading PDF:', error);
         btn.innerHTML = '<span>❌</span> Error';
+        alert('下载失败: ' + error.message);
         setTimeout(() => {
             btn.innerHTML = originalHTML;
             btn.disabled = false;
         }, 2000);
+    }
+}
+
+async function deletePdfTxt(paperId, title) {
+    if (!confirm('确定要删除这篇论文的 PDF 和文本文件吗？')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/papers/api/pdf/${encodeURIComponent(paperId)}?title=${encodeURIComponent(title)}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            // Reset UI
+            const paperCard = document.querySelector(`.paper-card[data-paper-id="${paperId}"]`);
+            if (paperCard) {
+                // Reset download button
+                const downloadBtn = paperCard.querySelector('.download-btn');
+                if (downloadBtn) {
+                    downloadBtn.innerHTML = '<span>⬇️</span> Download PDF & Extract Text';
+                    downloadBtn.classList.remove('downloaded');
+                    downloadBtn.disabled = false;
+                }
+                
+                // Hide status indicators
+                const pdfStatus = paperCard.querySelector('.pdf-status');
+                if (pdfStatus) {
+                    pdfStatus.style.display = 'none';
+                }
+                const txtStatus = paperCard.querySelector('.txt-status');
+                if (txtStatus) {
+                    txtStatus.style.display = 'none';
+                }
+                
+                // Hide delete button
+                const deleteBtn = paperCard.querySelector('.delete-pdf-btn');
+                if (deleteBtn) {
+                    deleteBtn.style.display = 'none';
+                }
+            }
+            alert('PDF 和文本文件已删除！');
+        } else {
+            throw new Error('Failed to delete');
+        }
+    } catch (error) {
+        console.error('Error deleting PDF/TXT:', error);
+        alert('删除失败，请重试。');
     }
 }
 </script>
