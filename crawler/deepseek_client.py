@@ -992,3 +992,88 @@ class DeepSeekClient:
                 'result': result
             })
         return results
+    
+    # ==================== Multi-turn Q&A Methods ====================
+    
+    def qa_stream(
+        self,
+        question: str,
+        paper_content: str,
+        history: list,
+        is_first_question: bool = False
+    ) -> Generator[Tuple[str, str, bool], None, None]:
+        """
+        Multi-turn Q&A streaming for paper discussion.
+        
+        Args:
+            question: Current question from user
+            paper_content: Full text content of the paper
+            history: Previous Q&A history in DeepSeek format:
+                     [{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}, ...]
+            is_first_question: Whether this is the first question (prepend paper content)
+        
+        Yields:
+            Tuple of (reasoning_content, content, is_reasoning)
+        """
+        if not self.client:
+            yield ("", "Error: DeepSeek API key not configured", False)
+            return
+        
+        try:
+            # Build messages array
+            messages = []
+            
+            # System message for Q&A context
+            system_message = """You are an expert academic research assistant. You are helping a researcher understand and analyze a scientific paper. 
+
+Your responses should be:
+1. Accurate and based on the paper content provided
+2. Clear and well-structured
+3. Technical when appropriate, but also accessible
+4. Include specific references to sections, figures, or equations from the paper when relevant
+
+If the question cannot be answered from the paper content, say so clearly and provide any relevant insights you can."""
+            
+            messages.append({"role": "system", "content": system_message})
+            
+            # Add conversation history
+            if history:
+                messages.extend(history)
+            
+            # Build current question
+            if is_first_question:
+                # First question: include paper content
+                current_message = f"""I'm reading the following academic paper and would like to discuss it with you.
+
+=== PAPER CONTENT START ===
+{paper_content}
+=== PAPER CONTENT END ===
+
+My question is:
+{question}"""
+            else:
+                # Follow-up questions: just the question
+                current_message = question
+            
+            messages.append({"role": "user", "content": current_message})
+            
+            # Call DeepSeek API with streaming
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                max_tokens=self.max_tokens,
+                stream=True
+            )
+            
+            for chunk in response:
+                delta = chunk.choices[0].delta
+                reasoning_content = getattr(delta, 'reasoning_content', None)
+                content = delta.content
+                
+                if reasoning_content:
+                    yield (reasoning_content, "", True)
+                elif content:
+                    yield ("", content, False)
+        
+        except Exception as e:
+            yield ("", f"Error: {str(e)}", False)

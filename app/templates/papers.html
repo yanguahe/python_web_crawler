@@ -88,18 +88,18 @@
                 <a href="{{ item.paper.arxiv_url }}" target="_blank" class="link-btn" title="View on arXiv">📄</a>
                 <a href="{{ item.paper.pdf_url }}" target="_blank" class="link-btn" title="View PDF Online">👁️</a>
                 {% if item.pdf_exists %}
-                <button class="link-btn downloaded" onclick="downloadToLocal('{{ item.paper.id }}', '{{ item.paper.title | e }}')" data-local-download-id="{{ item.paper.id }}" title="Download PDF to Local">💾</button>
+                <button class="link-btn downloaded" onclick='downloadToLocal("{{ item.paper.id }}", {{ item.paper.title | tojson }})' data-local-download-id="{{ item.paper.id }}" title="Download PDF to Local">💾</button>
                 <span class="link-btn status-indicator pdf-exists" title="PDF 已在服务器">📥</span>
                 {% if item.text_exists %}
                 <span class="link-btn status-indicator txt-exists" title="文本已提取">📝</span>
                 {% endif %}
-                <button class="link-btn warning" onclick="deletePdfTxt('{{ item.paper.id }}', '{{ item.paper.title | e }}')" title="Delete PDF & Text">🗑️📄</button>
+                <button class="link-btn warning" onclick='deletePdfTxt("{{ item.paper.id }}", {{ item.paper.title | tojson }})' title="Delete PDF & Text">🗑️📄</button>
                 {% else %}
                 <button class="link-btn download" onclick="downloadToServer('{{ item.paper.id }}')" data-download-id="{{ item.paper.id }}" title="Download PDF & Extract Text">⬇️</button>
                 {% endif %}
                 {% if item.analysis_exists %}
                 <a href="/analysis/view/{{ item.paper.title | urlencode }}_abstract_ds_analyze.html" target="_blank" class="link-btn analysis-link" title="View Analysis">🌐</a>
-                <button class="link-btn warning" onclick="deleteAnalysis('{{ item.paper.title | e }}')" title="Delete Analysis">🧹</button>
+                <button class="link-btn warning" onclick='deleteAnalysis({{ item.paper.title | tojson }})' title="Delete Analysis">🧹</button>
                 {% endif %}
                 <button class="link-btn danger" onclick="deletePaper('{{ item.paper.id }}')" title="Delete Paper">🗑️</button>
             </div>

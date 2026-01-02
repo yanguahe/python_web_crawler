@@ -3,12 +3,13 @@ Main FastAPI application.
 """
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from config import settings
 from .routes import search_router, papers_router, analysis_router
+from .auth import verify_credentials
 
 # Get the app directory
 APP_DIR = Path(__file__).resolve().parent
@@ -17,12 +18,18 @@ APP_DIR = Path(__file__).resolve().parent
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     
+    # Global dependencies - all routes require authentication when enabled
+    dependencies = []
+    if settings.auth_enabled:
+        dependencies.append(Depends(verify_credentials))
+    
     application = FastAPI(
         title=settings.app_name,
         description="A web application to search and save arXiv paper abstracts",
         version="1.0.0",
         docs_url="/docs",
-        redoc_url="/redoc"
+        redoc_url="/redoc",
+        dependencies=dependencies  # Apply authentication globally
     )
     
     # Mount static files

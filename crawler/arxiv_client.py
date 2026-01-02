@@ -32,6 +32,92 @@ class ArxivClient:
                 await asyncio.sleep(self.rate_limit_delay - elapsed)
         self._last_request_time = asyncio.get_event_loop().time()
     
+    # Common English stop words that don't add search value
+    STOP_WORDS = {
+        'a', 'an', 'the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+        'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'been',
+        'be', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would',
+        'could', 'should', 'may', 'might', 'must', 'shall', 'can', 'need',
+        'into', 'through', 'during', 'before', 'after', 'above', 'below',
+        'between', 'under', 'again', 'further', 'then', 'once', 'here',
+        'there', 'when', 'where', 'why', 'how', 'all', 'each', 'few', 'more',
+        'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own',
+        'same', 'so', 'than', 'too', 'very', 'just', 'also', 'now', 'its'
+    }
+    
+    def _clean_query_word(self, word: str) -> str:
+        """
+        Clean a single word for use in arXiv query.
+        Removes punctuation that could interfere with query syntax.
+        
+        Args:
+            word: Raw word from user query
+            
+        Returns:
+            Cleaned word safe for arXiv API
+        """
+        # Remove common punctuation that interferes with arXiv query syntax
+        # Keep alphanumeric, hyphens (for compound words), and underscores
+        cleaned = re.sub(r'[^\w\-]', '', word)
+        return cleaned
+    
+    def _build_search_query(self, query: str) -> str:
+        """
+        Build a properly formatted arXiv search query.
+        
+        The arXiv API requires specific query syntax:
+        - Multiple terms should be connected with AND/OR operators
+        - Field prefixes like 'all:', 'ti:', 'au:' specify search fields
+        - Quotes can be used for phrase searches
+        
+        Args:
+            query: Raw search query from user
+            
+        Returns:
+            Properly formatted search query string
+        """
+        query = query.strip()
+        
+        if not query:
+            return ""
+        
+        # Check if user already provided field prefix (e.g., ti:, au:, cat:)
+        field_prefixes = ['ti:', 'au:', 'abs:', 'cat:', 'all:', 'id:']
+        has_prefix = any(query.lower().startswith(prefix) for prefix in field_prefixes)
+        
+        if has_prefix:
+            # User provided their own query syntax, use as-is
+            return query
+        
+        # Split query into words and clean them
+        raw_words = query.split()
+        
+        # Clean words: remove punctuation and filter out stop words and empty strings
+        words = []
+        for word in raw_words:
+            cleaned = self._clean_query_word(word)
+            # Keep word if it's not empty and not a stop word
+            if cleaned and cleaned.lower() not in self.STOP_WORDS:
+                words.append(cleaned)
+        
+        # If all words were filtered out, use the original query with basic cleaning
+        if not words:
+            words = [self._clean_query_word(w) for w in raw_words if self._clean_query_word(w)]
+        
+        if not words:
+            return ""
+        
+        if len(words) == 1:
+            # Single word: search in title first (most relevant), then abstract
+            word = words[0]
+            return f"ti:{word} OR abs:{word}"
+        else:
+            # Multi-word query: prioritize title search with all words connected by AND
+            # This gives better relevance ranking than OR-ing multiple field searches
+            # arXiv relevance sort works best with simpler queries
+            ti_terms = ' AND '.join([f'ti:{word}' for word in words])
+            return ti_terms
+    
     def _build_query_url(
         self,
         query: str,
@@ -56,9 +142,11 @@ class ArxivClient:
         if max_results is None:
             max_results = self.max_results
         
-        # Build the search query - search in all fields
+        # Build the search query with proper syntax for arXiv API
+        search_query = self._build_search_query(query)
+        
         params = {
-            "search_query": f"all:{query}",
+            "search_query": search_query,
             "start": start,
             "max_results": max_results,
             "sortBy": sort_by,

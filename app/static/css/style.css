@@ -1004,7 +1004,7 @@ a:hover {
     border-radius: 4px;
     white-space: pre-wrap;
     word-wrap: break-word;
-    max-height: 300px;
+    max-height: 1200px;
     overflow-y: auto;
     color: #a3e635;
     margin: 0;
@@ -1038,11 +1038,48 @@ a:hover {
     margin-bottom: var(--space-sm);
 }
 
+/* Collapsible Reasoning Section */
+.collapsible-section .collapsible-header {
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) 0;
+    transition: color 0.2s;
+}
+
+.collapsible-section .collapsible-header:hover {
+    color: #a78bfa;
+}
+
+.collapsible-section .collapse-icon {
+    font-size: 0.8rem;
+    transition: transform 0.2s;
+    display: inline-block;
+    width: 1em;
+}
+
+.collapsible-section .collapsible-content {
+    animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 .analysis-reasoning .reasoning-content {
     font-size: 0.85rem;
     color: var(--color-text-secondary);
     line-height: 1.6;
-    max-height: 400px;
+    max-height: 1600px;
     overflow-y: auto;
     scroll-behavior: smooth;
     white-space: pre-wrap;
@@ -1066,9 +1103,7 @@ a:hover {
     font-size: 0.9rem;
     color: var(--color-text-primary);
     line-height: 1.7;
-    max-height: 400px;
-    overflow-y: auto;
-    scroll-behavior: smooth;
+    /* Removed max-height and overflow - let .analysis-preview handle scrolling */
 }
 
 .analysis-content .content-text strong {
@@ -1117,15 +1152,27 @@ a:hover {
     color: white;
 }
 
+/* 
+ * Analysis Preview - the ONLY scrolling container for analysis results
+ * Height: 1200px (4x original 300px)
+ */
 .analysis-preview {
     font-size: 0.85rem;
     color: var(--color-text-secondary);
     line-height: 1.6;
-    max-height: 150px;
-    overflow-y: auto;
+    max-height: 1200px !important;
+    overflow-y: auto !important;
+    overflow-x: auto !important;
     padding: var(--space-sm);
     background: var(--color-bg-secondary);
     border-radius: var(--radius-sm);
+}
+
+/* Remove scrollbar from html-stream inside analysis-preview */
+.analysis-preview .html-stream {
+    max-height: none !important;
+    overflow-y: visible !important;
+    overflow-x: visible !important;
 }
 
 /* Pagination */
@@ -1687,6 +1734,502 @@ a:hover {
     .action-btn.large {
         width: 100%;
         justify-content: center;
+    }
+}
+
+/* ==================== Q&A Section Styles ==================== */
+
+.qa-section {
+    background: var(--color-bg-secondary);
+    border-radius: var(--radius-lg);
+    padding: var(--space-xl);
+    margin-bottom: var(--space-xl);
+    border: 1px solid var(--color-border);
+}
+
+.qa-section .section-title {
+    color: #a78bfa;
+    margin-bottom: var(--space-sm);
+}
+
+.qa-section .section-description {
+    color: var(--color-text-secondary);
+    margin-bottom: var(--space-lg);
+    font-size: 0.9rem;
+}
+
+.qa-disabled {
+    opacity: 0.7;
+}
+
+.qa-notice {
+    background: rgba(234, 179, 8, 0.1);
+    border: 1px solid rgba(234, 179, 8, 0.3);
+    border-radius: var(--radius-md);
+    padding: var(--space-lg);
+    color: var(--color-text-secondary);
+}
+
+.qa-notice p {
+    margin-bottom: var(--space-sm);
+}
+
+.qa-notice p:last-child {
+    margin-bottom: 0;
+}
+
+/* Q&A Prompt Section (matches Fulltext Analysis Prompt style) */
+.qa-prompt-section {
+    margin-bottom: var(--space-xl);
+}
+
+.qa-prompt-section .prompt-icon {
+    color: #a78bfa;
+}
+
+.qa-prompt-section .prompt-header h3 {
+    color: #a78bfa;
+}
+
+.qa-prompt-section .prompt-textarea:focus {
+    border-color: #8b5cf6;
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15);
+}
+
+.qa-prompt-section .action-btn.analyze-btn {
+    background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%);
+}
+
+.qa-prompt-section .action-btn.analyze-btn:hover {
+    background: linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%);
+}
+
+/* Q&A Current Response */
+.qa-current-response {
+    background: var(--color-bg-tertiary);
+    border-radius: var(--radius-md);
+    padding: var(--space-lg);
+    margin-bottom: var(--space-xl);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+.qa-response-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-md);
+    padding-bottom: var(--space-sm);
+    border-bottom: 1px solid rgba(139, 92, 246, 0.3);
+    font-weight: 600;
+    color: #a78bfa;
+}
+
+/* Q&A History */
+.qa-history {
+    margin-top: var(--space-2xl);
+}
+
+.qa-history-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-xl);
+    padding-bottom: var(--space-md);
+    border-bottom: 2px solid rgba(139, 92, 246, 0.3);
+}
+
+.qa-history-header h3 {
+    font-size: 1.2rem;
+    color: #a78bfa;
+    margin: 0;
+}
+
+.qa-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xl);
+}
+
+.qa-empty-message {
+    color: var(--color-text-secondary);
+    text-align: center;
+    padding: var(--space-2xl);
+    font-style: italic;
+    background: rgba(139, 92, 246, 0.05);
+    border-radius: var(--radius-md);
+    border: 1px dashed rgba(139, 92, 246, 0.3);
+}
+
+/* Q&A Entry */
+.qa-entry {
+    background: var(--color-bg-tertiary);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--color-border);
+    overflow: hidden;
+}
+
+.qa-entry-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-md) var(--space-lg);
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(139, 92, 246, 0.05) 100%);
+    border-bottom: 1px solid rgba(139, 92, 246, 0.2);
+}
+
+.qa-entry-number {
+    background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%);
+    color: white;
+    padding: 6px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.qa-entry-time {
+    color: var(--color-text-secondary);
+    font-size: 0.85rem;
+    flex-grow: 1;
+}
+
+.qa-entry-toggle,
+.qa-entry-delete {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    transition: all 0.2s;
+    font-size: 1.1rem;
+}
+
+.qa-entry-toggle {
+    color: var(--color-text-secondary);
+}
+
+.qa-entry-toggle:hover {
+    background: rgba(139, 92, 246, 0.15);
+    color: #a78bfa;
+}
+
+.qa-entry-delete {
+    opacity: 0.6;
+}
+
+.qa-entry-delete:hover {
+    opacity: 1;
+    background: rgba(239, 68, 68, 0.15);
+}
+
+.qa-entry-question {
+    padding: var(--space-lg);
+    color: var(--color-text-primary);
+    font-size: 1rem;
+    background: var(--color-bg-secondary);
+    line-height: 1.6;
+}
+
+.qa-entry-question strong {
+    color: #a78bfa;
+    font-size: 1.05rem;
+}
+
+.qa-entry-details {
+    padding: var(--space-lg);
+    border-top: 1px solid var(--color-border);
+    background: var(--color-bg-primary);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+}
+
+.qa-entry-reasoning,
+.qa-entry-answer {
+    margin-bottom: 0;
+}
+
+/* Q&A Entry - Reasoning Style (matching analysis-reasoning) */
+.qa-entry-reasoning {
+    background: rgba(139, 92, 246, 0.1);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+}
+
+.qa-entry-reasoning h5 {
+    font-size: 1rem;
+    color: #8b5cf6;
+    margin-bottom: var(--space-md);
+    padding-bottom: var(--space-sm);
+    border-bottom: 1px solid rgba(139, 92, 246, 0.2);
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.qa-entry-reasoning .reasoning-content {
+    font-size: 0.9rem;
+    color: var(--color-text-secondary);
+    line-height: 1.7;
+    max-height: 500px;
+    overflow-y: auto;
+    padding: var(--space-md);
+    background: rgba(0, 0, 0, 0.25);
+    border-radius: var(--radius-md);
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+/* Q&A Entry - Answer Style (matching analysis-content) */
+.qa-entry-answer {
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+}
+
+.qa-entry-answer h5 {
+    font-size: 1rem;
+    color: #3b82f6;
+    margin-bottom: var(--space-md);
+    padding-bottom: var(--space-sm);
+    border-bottom: 1px solid rgba(59, 130, 246, 0.2);
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.qa-entry-answer .answer-content {
+    font-size: 0.95rem;
+    color: var(--color-text-primary);
+    line-height: 1.8;
+    max-height: 600px;
+    overflow-y: auto;
+    padding: var(--space-md);
+    background: rgba(0, 0, 0, 0.25);
+    border-radius: var(--radius-md);
+}
+
+.qa-entry-answer .answer-content strong,
+.qa-entry-answer .answer-content .md-bold {
+    color: var(--color-accent-primary);
+}
+
+.qa-entry-answer .answer-content code {
+    background: var(--color-bg-tertiary);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+}
+
+/* ==================== Markdown Rendering Styles ==================== */
+
+/* Markdown Headers */
+.md-h3 {
+    font-size: 1.3rem;
+    color: var(--color-accent-primary);
+    margin: 1rem 0 0.5rem 0;
+    padding-bottom: 0.3rem;
+    border-bottom: 1px solid rgba(6, 182, 212, 0.3);
+}
+
+.md-h4 {
+    font-size: 1.15rem;
+    color: #a78bfa;
+    margin: 0.8rem 0 0.4rem 0;
+}
+
+.md-h5 {
+    font-size: 1.05rem;
+    color: #3b82f6;
+    margin: 0.6rem 0 0.3rem 0;
+}
+
+.md-h6 {
+    font-size: 1rem;
+    color: var(--color-text-secondary);
+    margin: 0.5rem 0 0.25rem 0;
+}
+
+/* Markdown Bold and Italic */
+.md-bold {
+    color: var(--color-accent-primary);
+    font-weight: 600;
+}
+
+.md-italic {
+    font-style: italic;
+    color: var(--color-text-secondary);
+}
+
+/* Markdown Inline Code */
+.md-inline-code {
+    background: rgba(139, 92, 246, 0.15);
+    color: #a78bfa;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+}
+
+/* Markdown Code Block */
+.md-code-block {
+    background: #1a1f2e;
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
+    margin: 0.8rem 0;
+    overflow-x: auto;
+}
+
+.md-code-block code {
+    color: #e2e8f0;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    line-height: 1.5;
+    white-space: pre;
+}
+
+/* Markdown Lists */
+.md-ul, .md-ol {
+    margin: 0.5rem 0;
+    padding-left: 1.5rem;
+}
+
+.md-ul {
+    list-style-type: disc;
+}
+
+.md-ol {
+    list-style-type: decimal;
+}
+
+.md-li, .md-li-ordered {
+    margin: 0.3rem 0;
+    color: var(--color-text-primary);
+    line-height: 1.6;
+}
+
+.md-li::marker {
+    color: var(--color-accent-primary);
+}
+
+.md-li-ordered::marker {
+    color: #a78bfa;
+    font-weight: 600;
+}
+
+/* Markdown Blockquote */
+.md-blockquote {
+    border-left: 4px solid #a78bfa;
+    background: rgba(139, 92, 246, 0.1);
+    padding: 0.8rem 1rem;
+    margin: 0.8rem 0;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    color: var(--color-text-secondary);
+    font-style: italic;
+}
+
+/* Markdown Horizontal Rule */
+.md-hr {
+    border: none;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.5), transparent);
+    margin: 1rem 0;
+}
+
+/* Markdown Links */
+.md-link {
+    color: var(--color-accent-primary);
+    text-decoration: none;
+    border-bottom: 1px dashed var(--color-accent-primary);
+    transition: all 0.2s;
+}
+
+.md-link:hover {
+    color: #22d3ee;
+    border-bottom-style: solid;
+}
+
+/* Math Expressions */
+.md-math-block {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    border-radius: var(--radius-md);
+    padding: var(--space-md) var(--space-lg);
+    margin: 0.8rem 0;
+    font-family: 'Cambria Math', 'Latin Modern Math', Georgia, serif;
+    font-size: 1.05rem;
+    color: #e2e8f0;
+    overflow-x: auto;
+    text-align: center;
+}
+
+.md-math-inline {
+    background: rgba(139, 92, 246, 0.15);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Cambria Math', 'Latin Modern Math', Georgia, serif;
+    font-size: 0.95em;
+    color: #a78bfa;
+}
+
+/* Subscript and Superscript in content */
+.qa-entry-answer .answer-content sub,
+.qa-entry-reasoning .reasoning-content sub,
+.analysis-reasoning .reasoning-content sub {
+    font-size: 0.75em;
+    vertical-align: sub;
+    color: #22d3ee;
+}
+
+.qa-entry-answer .answer-content sup,
+.qa-entry-reasoning .reasoning-content sup,
+.analysis-reasoning .reasoning-content sup {
+    font-size: 0.75em;
+    vertical-align: super;
+    color: #a78bfa;
+}
+
+/* Apply markdown styles to Q&A reasoning content too */
+.qa-entry-reasoning .reasoning-content .md-bold,
+.qa-entry-reasoning .reasoning-content strong {
+    color: #a78bfa;
+}
+
+.qa-entry-reasoning .reasoning-content .md-inline-code {
+    background: rgba(139, 92, 246, 0.2);
+}
+
+/* Q&A Clear All Button */
+.qa-clear-btn {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #ef4444;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+}
+
+.qa-clear-btn:hover {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.5);
+}
+
+/* Q&A Responsive */
+@media (max-width: 768px) {
+    .qa-input-wrapper {
+        flex-direction: column;
+    }
+    
+    .qa-entry-header {
+        flex-wrap: wrap;
+    }
+    
+    .qa-entry-time {
+        width: 100%;
+        order: 3;
+        margin-top: var(--space-xs);
     }
 }
 

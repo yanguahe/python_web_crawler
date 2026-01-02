@@ -70,7 +70,7 @@
         <!-- Download PDF Button -->
         {% if pdf_exists %}
         <button class="action-btn download-btn large downloaded" 
-                onclick="downloadToLocal('{{ paper.id }}', '{{ paper.title | e }}')" 
+                onclick="downloadToLocal('{{ paper.id }}')" 
                 data-local-download-id="{{ paper.id }}">
             <span>💾</span> Download PDF to Local
         </button>
@@ -83,7 +83,7 @@
         </span>
         {% endif %}
         <button class="action-btn delete-pdf-btn large" 
-                onclick="deletePdfTxt('{{ paper.id }}', '{{ paper.title | e }}')">
+                onclick="deletePdfTxt('{{ paper.id }}')">
             <span>🗑️</span> Delete PDF/TXT
         </button>
         {% else %}
@@ -110,14 +110,14 @@
         </div>
     </section>
     
-    <!-- AI Analysis Section -->
+    <!-- Abstract Analysis Section -->
     <section class="paper-analysis-section">
-        <h2 class="section-title">🤖 AI Analysis (DeepSeek)</h2>
+        <h2 class="section-title">🤖 Abstract Analysis (DeepSeek)</h2>
         
         <div class="analysis-prompt-section">
             <div class="prompt-header">
                 <span class="prompt-icon">💡</span>
-                <h3>Analysis Prompt</h3>
+                <h3>Abstract Analysis Prompt</h3>
                 <span class="api-status" id="apiStatus">Checking...</span>
             </div>
             <div class="prompt-input-wrapper">
@@ -130,7 +130,7 @@
             </div>
             <div class="prompt-actions">
                 <button class="action-btn analyze-btn large" 
-                        onclick="analyzePaperStream('{{ paper.id }}', '{{ paper.title | e }}')"
+                        onclick="analyzePaperStream('{{ paper.id }}')"
                         data-analyze-id="{{ paper.id }}">
                     <span>🤖</span> Analyze Abstract
                 </button>
@@ -138,11 +138,11 @@
                 <a href="/analysis/view/{{ paper.title | urlencode }}" 
                    target="_blank" 
                    class="action-btn view-analysis-btn large">
-                    <span>🌐</span> View Saved Analysis
+                    <span>🌐</span> View Saved Abstract Analysis
                 </a>
                 <button class="action-btn delete-analysis-btn large" 
-                        onclick="deleteAnalysis('{{ paper.title | e }}')">
-                    <span>🧹</span> Delete Analysis
+                        onclick="deleteAnalysis()">
+                    <span>🧹</span> Delete Abstract Analysis
                 </button>
                 {% endif %}
             </div>
@@ -152,21 +152,23 @@
         {% if reasoning_exists %}
         <div class="analysis-result" id="savedAnalysisResult" style="display: block;">
             <div class="analysis-header">
-                <span>🤖 Saved AI Analysis</span>
+                <span>🤖 Saved Abstract Analysis</span>
                 <button class="close-analysis" onclick="closeSavedAnalysis()">&times;</button>
             </div>
-            <div class="analysis-reasoning" id="savedReasoning">
-                <h4>💭 Reasoning Process (Saved)</h4>
-                <div class="reasoning-content" id="savedReasoningContent">
+            <div class="analysis-reasoning collapsible-section" id="savedReasoning">
+                <h4 class="collapsible-header" onclick="toggleCollapsible('savedReasoningContent', this)">
+                    <span class="collapse-icon">▶</span> 💭 Reasoning Process (Saved)
+                </h4>
+                <div class="reasoning-content collapsible-content" id="savedReasoningContent" style="display: none;">
                     <div class="loading">Loading saved reasoning...</div>
                 </div>
             </div>
             {% if analysis_exists %}
             <div class="analysis-content">
-                <h4>📝 Analysis Result</h4>
+                <h4>📝 Abstract Analysis Result</h4>
                 <div class="content-text">
                     <a href="/analysis/view/{{ paper.title | urlencode }}" target="_blank" class="view-html-btn">
-                        <span>🌐</span> View Full HTML Analysis
+                        <span>🌐</span> View Saved Abstract Analysis
                     </a>
                 </div>
             </div>
@@ -177,7 +179,7 @@
         <!-- Live Analysis Result (hidden by default) -->
         <div class="analysis-result" id="analysisResult" style="display: none;">
             <div class="analysis-header">
-                <span>🤖 AI Analysis Result</span>
+                <span>🤖 Abstract Analysis Result</span>
                 <span class="streaming-indicator" id="streamingIndicator" style="display: none;">⏳ Streaming...</span>
                 <button class="close-analysis" onclick="closeAnalysis()">&times;</button>
             </div>
@@ -186,7 +188,7 @@
                 <div class="reasoning-content"></div>
             </div>
             <div class="analysis-content" id="analysisContent">
-                <h4>📝 Analysis Result</h4>
+                <h4>📝 Abstract Analysis Result</h4>
                 <div class="content-text"></div>
             </div>
         </div>
@@ -213,7 +215,7 @@
             </div>
             <div class="prompt-actions">
                 <button class="action-btn analyze-btn large" 
-                        onclick="analyzeFulltextStream('{{ paper.id }}', '{{ paper.title | e }}')"
+                        onclick="analyzeFulltextStream('{{ paper.id }}')"
                         data-fulltext-analyze-id="{{ paper.id }}">
                     <span>📚</span> Analyze Fulltext
                 </button>
@@ -224,7 +226,7 @@
                     <span>🌐</span> View Saved Fulltext Analysis
                 </a>
                 <button class="action-btn delete-analysis-btn large" 
-                        onclick="deleteFulltextAnalysis('{{ paper.title | e }}')">
+                        onclick="deleteFulltextAnalysis()">
                     <span>🧹</span> Delete Fulltext Analysis
                 </button>
                 {% endif %}
@@ -238,9 +240,11 @@
                 <span>📚 Saved Fulltext Analysis</span>
                 <button class="close-analysis" onclick="closeSavedFulltextAnalysis()">&times;</button>
             </div>
-            <div class="analysis-reasoning" id="savedFulltextReasoning">
-                <h4>💭 Reasoning Process (Saved)</h4>
-                <div class="reasoning-content" id="savedFulltextReasoningContent">
+            <div class="analysis-reasoning collapsible-section" id="savedFulltextReasoning">
+                <h4 class="collapsible-header" onclick="toggleCollapsible('savedFulltextReasoningContent', this)">
+                    <span class="collapse-icon">▶</span> 💭 Reasoning Process (Saved)
+                </h4>
+                <div class="reasoning-content collapsible-content" id="savedFulltextReasoningContent" style="display: none;">
                     <div class="loading">Loading saved reasoning...</div>
                 </div>
             </div>
@@ -249,7 +253,7 @@
                 <h4>📝 Fulltext Analysis Result</h4>
                 <div class="content-text">
                     <a href="/analysis/fulltext/view/{{ paper.title | urlencode }}" target="_blank" class="view-html-btn">
-                        <span>🌐</span> View Full HTML Fulltext Analysis
+                        <span>🌐</span> View Saved Fulltext Analysis
                     </a>
                 </div>
             </div>
@@ -272,6 +276,72 @@
                 <h4>📝 Fulltext Analysis Result</h4>
                 <div class="content-text"></div>
             </div>
+        </div>
+    </section>
+    {% endif %}
+    
+    <!-- Q&A Section (only shown if text content exists) -->
+    {% if text_exists %}
+    <section class="qa-section">
+        <h2 class="section-title">💬 Q&A with DeepSeek</h2>
+        
+        <!-- Q&A Input Area (same style as Fulltext Analysis Prompt) -->
+        <div class="analysis-prompt-section qa-prompt-section">
+            <div class="prompt-header">
+                <span class="prompt-icon">💭</span>
+                <h3>Your Question</h3>
+                <span class="api-status ready">✅ Ready</span>
+            </div>
+            <div class="prompt-input-wrapper">
+                <textarea id="qaQuestionInput" 
+                    class="prompt-textarea"
+                    placeholder="Enter your question about this paper... (e.g., 'What is the main contribution of this paper?', 'How does the proposed method compare to existing approaches?', 'Can you explain the experimental setup?')"
+                    rows="3"></textarea>
+            </div>
+            <p class="prompt-hint">💡 DeepSeek will answer based on the full paper content. Your conversation history will be preserved for multi-turn dialogue.</p>
+            <div class="prompt-actions">
+                <button class="action-btn analyze-btn large" id="qaAskBtn" onclick="askQuestion()">
+                    <span>🚀</span> Ask DeepSeek
+                </button>
+            </div>
+        </div>
+        
+        <!-- Current Q&A Response (shown during/after streaming) -->
+        <div class="qa-current-response" id="qaCurrentResponse" style="display: none;">
+            <div class="qa-response-header">
+                <span>🤖 DeepSeek's Response</span>
+                <span class="streaming-indicator" id="qaStreamingIndicator" style="display: none;">⏳ Streaming...</span>
+            </div>
+            <div class="analysis-reasoning" id="qaReasoning">
+                <h4>💭 Reasoning Process</h4>
+                <div class="reasoning-content"></div>
+            </div>
+            <div class="analysis-content" id="qaAnswer">
+                <h4>📝 Answer</h4>
+                <div class="content-text"></div>
+            </div>
+        </div>
+        
+        <!-- Q&A History -->
+        <div class="qa-history" id="qaHistory">
+            <div class="qa-history-header">
+                <h3>📜 Conversation History</h3>
+                <button class="action-btn delete-btn qa-clear-btn" id="qaClearAllBtn" onclick="clearAllQA()" style="display: none;">
+                    <span>🗑️</span> Clear All
+                </button>
+            </div>
+            <div class="qa-history-list" id="qaHistoryList">
+                <!-- Q&A entries will be loaded here -->
+                <p class="qa-empty-message" id="qaEmptyMessage">💡 No questions asked yet. Start a conversation by asking a question above!</p>
+            </div>
+        </div>
+    </section>
+    {% else %}
+    <section class="qa-section qa-disabled">
+        <h2 class="section-title">💬 Q&A with DeepSeek</h2>
+        <div class="qa-notice">
+            <p>⚠️ Q&A is not available because the paper text content has not been extracted yet.</p>
+            <p>Please click "Download PDF & Extract Text" button above to enable Q&A.</p>
         </div>
     </section>
     {% endif %}
@@ -464,7 +534,7 @@ function closeFulltextAnalysis() {
     }
 }
 
-async function analyzeFulltextStream(paperId, title) {
+async function analyzeFulltextStream(paperId) {
     const prompt = document.getElementById('fulltextAnalysisPrompt').value.trim();
     
     if (!prompt) {
@@ -518,7 +588,7 @@ async function analyzeFulltextStream(paperId, title) {
             },
             body: JSON.stringify({
                 paper_id: paperId,
-                title: title,
+                title: PAPER_TITLE,
                 fulltext: FULLTEXT_CONTENT,
                 prompt: prompt
             })
@@ -560,10 +630,11 @@ async function analyzeFulltextStream(paperId, title) {
                                     contentDiv.innerHTML = '';
                                 }
                                 contentBuffer += data.content;
-                                contentDiv.innerHTML = `<div class="analysis-preview"><pre class="html-stream" id="fulltextHtmlStreamPre">${escapeHtml(contentBuffer)}<span class="cursor-blink">▌</span></pre></div>`;
-                                const preEl = document.getElementById('fulltextHtmlStreamPre');
-                                if (preEl) {
-                                    preEl.scrollTop = preEl.scrollHeight;
+                                contentDiv.innerHTML = `<div class="analysis-preview" id="fulltextPreviewBox"><pre class="html-stream">${escapeHtml(contentBuffer)}<span class="cursor-blink">▌</span></pre></div>`;
+                                // Auto-scroll the analysis-preview container
+                                const previewBox = document.getElementById('fulltextPreviewBox');
+                                if (previewBox) {
+                                    previewBox.scrollTop = previewBox.scrollHeight;
                                 }
                             } else if (data.type === 'done') {
                                 streamingIndicator.style.display = 'none';
@@ -613,13 +684,13 @@ async function analyzeFulltextStream(paperId, title) {
     }
 }
 
-async function deleteFulltextAnalysis(title) {
+async function deleteFulltextAnalysis() {
     if (!confirm('确定要删除这篇论文的全文分析结果吗？')) {
         return;
     }
     
     try {
-        const response = await fetch(`/analysis/fulltext/delete/${encodeURIComponent(title)}`, {
+        const response = await fetch(`/analysis/fulltext/delete/${encodeURIComponent(PAPER_TITLE)}`, {
             method: 'DELETE'
         });
         
@@ -737,7 +808,7 @@ async function downloadToServer(paperId) {
     }
 }
 
-async function downloadToLocal(paperId, paperTitle) {
+async function downloadToLocal(paperId) {
     const btn = document.querySelector(`button[data-local-download-id="${paperId}"]`);
     if (!btn) {
         console.error('downloadToLocal: button not found for paperId:', paperId);
@@ -750,8 +821,8 @@ async function downloadToLocal(paperId, paperTitle) {
     
     try {
         let url = `/papers/api/pdf/${paperId}`;
-        if (paperTitle) {
-            url += `?title=${encodeURIComponent(paperTitle)}`;
+        if (PAPER_TITLE) {
+            url += `?title=${encodeURIComponent(PAPER_TITLE)}`;
         }
         window.open(url, '_blank');
         btn.innerHTML = originalHTML;
@@ -767,13 +838,13 @@ async function downloadToLocal(paperId, paperTitle) {
     }
 }
 
-async function deletePdfTxt(paperId, title) {
+async function deletePdfTxt(paperId) {
     if (!confirm('确定要删除这篇论文的 PDF 和文本文件吗？')) {
         return;
     }
     
     try {
-        const response = await fetch(`/papers/api/pdf/${encodeURIComponent(paperId)}?title=${encodeURIComponent(title)}`, {
+        const response = await fetch(`/papers/api/pdf/${encodeURIComponent(paperId)}?title=${encodeURIComponent(PAPER_TITLE)}`, {
             method: 'DELETE'
         });
         
@@ -789,7 +860,7 @@ async function deletePdfTxt(paperId, title) {
     }
 }
 
-async function analyzePaperStream(paperId, title) {
+async function analyzePaperStream(paperId) {
     const prompt = document.getElementById('analysisPrompt').value.trim();
     const abstract = document.getElementById('paperAbstract').textContent.trim();
     
@@ -839,7 +910,7 @@ async function analyzePaperStream(paperId, title) {
             },
             body: JSON.stringify({
                 paper_id: paperId,
-                title: title,
+                title: PAPER_TITLE,
                 abstract: abstract,
                 prompt: prompt
             })
@@ -888,11 +959,11 @@ async function analyzePaperStream(paperId, title) {
                                 }
                                 contentBuffer += data.content;
                                 // Show content with cursor - display as code preview since it's HTML
-                                contentDiv.innerHTML = `<div class="analysis-preview"><pre class="html-stream" id="htmlStreamPre">${escapeHtml(contentBuffer)}<span class="cursor-blink">▌</span></pre></div>`;
-                                // Auto-scroll the pre element (which has the overflow)
-                                const preEl = document.getElementById('htmlStreamPre');
-                                if (preEl) {
-                                    preEl.scrollTop = preEl.scrollHeight;
+                                contentDiv.innerHTML = `<div class="analysis-preview" id="analysisPreviewBox"><pre class="html-stream">${escapeHtml(contentBuffer)}<span class="cursor-blink">▌</span></pre></div>`;
+                                // Auto-scroll the analysis-preview container (which has overflow-y: auto)
+                                const previewBox = document.getElementById('analysisPreviewBox');
+                                if (previewBox) {
+                                    previewBox.scrollTop = previewBox.scrollHeight;
                                 }
                             } else if (data.type === 'done') {
                                 streamingIndicator.style.display = 'none';
@@ -970,8 +1041,8 @@ function escapeHtml(text) {
 }
 
 // Keep the old non-streaming function as backup
-async function analyzePaper(paperId, title) {
-    return analyzePaperStream(paperId, title);
+async function analyzePaper(paperId) {
+    return analyzePaperStream(paperId);
 }
 
 function closeAnalysis() {
@@ -984,13 +1055,13 @@ function closeAnalysis() {
     }
 }
 
-async function deleteAnalysis(title) {
+async function deleteAnalysis() {
     if (!confirm('确定要删除这篇论文的分析结果吗？')) {
         return;
     }
     
     try {
-        const response = await fetch(`/analysis/delete/${encodeURIComponent(title)}`, {
+        const response = await fetch(`/analysis/delete/${encodeURIComponent(PAPER_TITLE)}`, {
             method: 'DELETE'
         });
         
@@ -1007,15 +1078,399 @@ async function deleteAnalysis(title) {
 }
 
 function formatMarkdown(text) {
-    // Basic markdown formatting
-    return text
-        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-        .replace(/\*(.*?)\*/g, '<em>$1</em>')
-        .replace(/`(.*?)`/g, '<code>$1</code>')
-        .replace(/\n/g, '<br>')
-        .replace(/^### (.*?)$/gm, '<h5>$1</h5>')
-        .replace(/^## (.*?)$/gm, '<h4>$1</h4>')
-        .replace(/^# (.*?)$/gm, '<h3>$1</h3>');
+    if (!text) return '';
+    
+    let html = text;
+    
+    // Protect math expressions first - wrap in special markers
+    // LaTeX style: $...$ or $$...$$
+    const mathPlaceholders = [];
+    html = html.replace(/\$\$([\s\S]*?)\$\$/g, function(match, math) {
+        mathPlaceholders.push({ type: 'block', content: math });
+        return `@@MATH_BLOCK_${mathPlaceholders.length - 1}@@`;
+    });
+    html = html.replace(/\$([^\$\n]+)\$/g, function(match, math) {
+        mathPlaceholders.push({ type: 'inline', content: math });
+        return `@@MATH_INLINE_${mathPlaceholders.length - 1}@@`;
+    });
+    
+    // Code blocks (```...```) - must be processed first
+    html = html.replace(/```(\w*)\n?([\s\S]*?)```/g, function(match, lang, code) {
+        const escapedCode = code.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return `<pre class="md-code-block"><code class="lang-${lang || 'text'}">${escapedCode.trim()}</code></pre>`;
+    });
+    
+    // Inline code (`...`) - protects content inside from other formatting
+    html = html.replace(/`([^`]+)`/g, '<code class="md-inline-code">$1</code>');
+    
+    // Headers (must process before other line-based rules)
+    html = html.replace(/^#### (.*?)$/gm, '<h6 class="md-h6">$1</h6>');
+    html = html.replace(/^### (.*?)$/gm, '<h5 class="md-h5">$1</h5>');
+    html = html.replace(/^## (.*?)$/gm, '<h4 class="md-h4">$1</h4>');
+    html = html.replace(/^# (.*?)$/gm, '<h3 class="md-h3">$1</h3>');
+    
+    // Bold: **text** or __text__ (but not inside words)
+    html = html.replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>');
+    html = html.replace(/\*\*([^*]+)\*\*/g, '<strong class="md-bold">$1</strong>');
+    // Only match __text__ at word boundaries to avoid matching variable names
+    html = html.replace(/(^|[\s\(])__([^_]+)__([\s\)\.,;:!?]|$)/g, '$1<strong class="md-bold">$2</strong>$3');
+    
+    // Italic: *text* (but not for math like a*b or x*y)
+    // Only match when * is at word boundary
+    html = html.replace(/(^|[\s\(])\*([^*\s][^*]*[^*\s])\*([\s\)\.,;:!?]|$)/g, '$1<em class="md-italic">$2</em>$3');
+    html = html.replace(/(^|[\s\(])\*([^*\s])\*([\s\)\.,;:!?]|$)/g, '$1<em class="md-italic">$2</em>$3');
+    
+    // DO NOT process single underscores as italic - they're often used in variable names
+    // html = html.replace(/_(.*?)_/g, ...) - REMOVED
+    
+    // Blockquotes
+    html = html.replace(/^> (.*?)$/gm, '<blockquote class="md-blockquote">$1</blockquote>');
+    html = html.replace(/<\/blockquote>\n<blockquote class="md-blockquote">/g, '<br>');
+    
+    // Horizontal rule
+    html = html.replace(/^(-{3,}|_{3,}|\*{3,})$/gm, '<hr class="md-hr">');
+    
+    // Unordered lists
+    html = html.replace(/^[\-\*] (.*?)$/gm, '<li class="md-li">$1</li>');
+    html = html.replace(/(<li class="md-li">.*?<\/li>)(\n<li class="md-li">)/g, '$1$2');
+    html = html.replace(/(<li class="md-li">.*<\/li>)/gs, '<ul class="md-ul">$1</ul>');
+    
+    // Ordered lists  
+    html = html.replace(/^\d+\. (.*?)$/gm, '<li class="md-li-ordered">$1</li>');
+    html = html.replace(/(<li class="md-li-ordered">.*?<\/li>)(\n<li class="md-li-ordered">)/g, '$1$2');
+    html = html.replace(/(<li class="md-li-ordered">.*<\/li>)/gs, '<ol class="md-ol">$1</ol>');
+    
+    // Links [text](url)
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" class="md-link">$1</a>');
+    
+    // Restore math expressions with proper styling
+    mathPlaceholders.forEach((item, idx) => {
+        if (item.type === 'block') {
+            html = html.replace(`@@MATH_BLOCK_${idx}@@`, `<div class="md-math-block">${formatMathExpression(item.content)}</div>`);
+        } else {
+            html = html.replace(`@@MATH_INLINE_${idx}@@`, `<span class="md-math-inline">${formatMathExpression(item.content)}</span>`);
+        }
+    });
+    
+    // Format standalone math-like expressions (equations with =, subscripts, etc.)
+    // Match patterns like: x_t = f(y), M_{memory}, etc.
+    html = html.replace(/([A-Za-z])_\{([^}]+)\}/g, '$1<sub>$2</sub>');
+    html = html.replace(/([A-Za-z])_([A-Za-z0-9])/g, '$1<sub>$2</sub>');
+    html = html.replace(/\^{([^}]+)}/g, '<sup>$1</sup>');
+    html = html.replace(/\^([A-Za-z0-9])/g, '<sup>$1</sup>');
+    
+    // Line breaks (convert remaining newlines)
+    html = html.replace(/\n/g, '<br>');
+    
+    // Clean up extra <br> after block elements
+    html = html.replace(/<\/(h[3-6]|pre|blockquote|ul|ol|hr|div)><br>/g, '</$1>');
+    html = html.replace(/<br><(h[3-6]|pre|blockquote|ul|ol)/g, '<$1');
+    
+    return html;
+}
+
+// Helper function to format math expressions
+function formatMathExpression(math) {
+    let formatted = math;
+    // Subscripts: x_{text} or x_t
+    formatted = formatted.replace(/([A-Za-z])_\{([^}]+)\}/g, '$1<sub>$2</sub>');
+    formatted = formatted.replace(/([A-Za-z])_([A-Za-z0-9]+)/g, '$1<sub>$2</sub>');
+    // Superscripts: x^{text} or x^2
+    formatted = formatted.replace(/\^{([^}]+)}/g, '<sup>$1</sup>');
+    formatted = formatted.replace(/\^([A-Za-z0-9]+)/g, '<sup>$1</sup>');
+    // Greek letters (common ones)
+    formatted = formatted.replace(/\\alpha/g, 'α');
+    formatted = formatted.replace(/\\beta/g, 'β');
+    formatted = formatted.replace(/\\gamma/g, 'γ');
+    formatted = formatted.replace(/\\delta/g, 'δ');
+    formatted = formatted.replace(/\\epsilon/g, 'ε');
+    formatted = formatted.replace(/\\eta/g, 'η');
+    formatted = formatted.replace(/\\theta/g, 'θ');
+    formatted = formatted.replace(/\\lambda/g, 'λ');
+    formatted = formatted.replace(/\\mu/g, 'μ');
+    formatted = formatted.replace(/\\sigma/g, 'σ');
+    formatted = formatted.replace(/\\tau/g, 'τ');
+    formatted = formatted.replace(/\\phi/g, 'φ');
+    formatted = formatted.replace(/\\psi/g, 'ψ');
+    formatted = formatted.replace(/\\omega/g, 'ω');
+    formatted = formatted.replace(/\\pi/g, 'π');
+    // Math operators
+    formatted = formatted.replace(/\\cdot/g, '·');
+    formatted = formatted.replace(/\\times/g, '×');
+    formatted = formatted.replace(/\\div/g, '÷');
+    formatted = formatted.replace(/\\pm/g, '±');
+    formatted = formatted.replace(/\\leq/g, '≤');
+    formatted = formatted.replace(/\\geq/g, '≥');
+    formatted = formatted.replace(/\\neq/g, '≠');
+    formatted = formatted.replace(/\\approx/g, '≈');
+    formatted = formatted.replace(/\\infty/g, '∞');
+    formatted = formatted.replace(/\\sum/g, '∑');
+    formatted = formatted.replace(/\\prod/g, '∏');
+    formatted = formatted.replace(/\\int/g, '∫');
+    formatted = formatted.replace(/\\partial/g, '∂');
+    formatted = formatted.replace(/\\nabla/g, '∇');
+    formatted = formatted.replace(/\\in/g, '∈');
+    formatted = formatted.replace(/\\subset/g, '⊂');
+    formatted = formatted.replace(/\\rightarrow/g, '→');
+    formatted = formatted.replace(/\\leftarrow/g, '←');
+    formatted = formatted.replace(/\\Rightarrow/g, '⇒');
+    formatted = formatted.replace(/\\forall/g, '∀');
+    formatted = formatted.replace(/\\exists/g, '∃');
+    return formatted;
+}
+
+// Toggle collapsible sections
+function toggleCollapsible(contentId, headerEl) {
+    const content = document.getElementById(contentId);
+    const icon = headerEl.querySelector('.collapse-icon');
+    
+    if (content.style.display === 'none') {
+        content.style.display = 'block';
+        icon.textContent = '▼';
+    } else {
+        content.style.display = 'none';
+        icon.textContent = '▶';
+    }
+}
+
+// ==================== Q&A Functions ====================
+
+// Load Q&A history on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadQAHistory();
+});
+
+async function loadQAHistory() {
+    try {
+        const response = await fetch(`/analysis/qa/history/${encodeURIComponent(PAPER_TITLE)}`);
+        const data = await response.json();
+        
+        if (data.success && data.history && data.history.length > 0) {
+            renderQAHistory(data.history);
+            document.getElementById('qaClearAllBtn').style.display = 'inline-flex';
+            document.getElementById('qaEmptyMessage').style.display = 'none';
+        } else {
+            document.getElementById('qaEmptyMessage').style.display = 'block';
+            document.getElementById('qaClearAllBtn').style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Error loading Q&A history:', error);
+    }
+}
+
+function renderQAHistory(history) {
+    const historyList = document.getElementById('qaHistoryList');
+    historyList.innerHTML = '';
+    
+    history.forEach((entry, index) => {
+        const entryEl = document.createElement('div');
+        entryEl.className = 'qa-entry';
+        entryEl.id = `qa-entry-${index}`;
+        
+        const timestamp = new Date(entry.timestamp).toLocaleString();
+        
+        entryEl.innerHTML = `
+            <div class="qa-entry-header">
+                <span class="qa-entry-number">Q${index + 1}</span>
+                <span class="qa-entry-time">${timestamp}</span>
+                <button class="qa-entry-toggle" onclick="toggleQAEntry(${index})" title="展开/折叠">▼</button>
+                <button class="qa-entry-delete" onclick="deleteQAEntry(${index})" title="删除此条">🗑️</button>
+            </div>
+            <div class="qa-entry-question">
+                <strong>❓ Question:</strong> ${escapeHtml(entry.question)}
+            </div>
+            <div class="qa-entry-details" id="qa-details-${index}" style="display: none;">
+                <div class="qa-entry-reasoning">
+                    <h5>💭 Reasoning Process</h5>
+                    <div class="reasoning-content">${formatMarkdown(entry.reasoning || 'No reasoning recorded')}</div>
+                </div>
+                <div class="qa-entry-answer">
+                    <h5>📝 Answer</h5>
+                    <div class="answer-content">${formatMarkdown(entry.answer)}</div>
+                </div>
+            </div>
+        `;
+        
+        historyList.appendChild(entryEl);
+    });
+}
+
+function toggleQAEntry(index) {
+    const details = document.getElementById(`qa-details-${index}`);
+    const toggleBtn = document.querySelector(`#qa-entry-${index} .qa-entry-toggle`);
+    
+    if (details.style.display === 'none') {
+        details.style.display = 'block';
+        toggleBtn.textContent = '▲';
+    } else {
+        details.style.display = 'none';
+        toggleBtn.textContent = '▼';
+    }
+}
+
+async function askQuestion() {
+    const questionInput = document.getElementById('qaQuestionInput');
+    const question = questionInput.value.trim();
+    
+    if (!question) {
+        alert('Please enter a question.');
+        return;
+    }
+    
+    const btn = document.getElementById('qaAskBtn');
+    const responseArea = document.getElementById('qaCurrentResponse');
+    const streamingIndicator = document.getElementById('qaStreamingIndicator');
+    const reasoningDiv = document.getElementById('qaReasoning').querySelector('.reasoning-content');
+    const answerDiv = document.getElementById('qaAnswer').querySelector('.content-text');
+    
+    // Show response area and reset content
+    responseArea.style.display = 'block';
+    streamingIndicator.style.display = 'inline';
+    reasoningDiv.innerHTML = '<span class="cursor-blink">▌</span>';
+    answerDiv.innerHTML = '<span class="loading-text">Waiting for response...</span>';
+    
+    // Disable button
+    const originalHTML = btn.innerHTML;
+    btn.innerHTML = '<span>⏳</span> Thinking...';
+    btn.disabled = true;
+    
+    try {
+        const response = await fetch('/analysis/qa/ask/stream', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                title: PAPER_TITLE,
+                question: question
+            })
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || 'Request failed');
+        }
+        
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        
+        let reasoningBuffer = '';
+        let answerBuffer = '';
+        let sseBuffer = '';
+        let isAnswerPhase = false;
+        
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            const chunk = decoder.decode(value, { stream: true });
+            sseBuffer += chunk;
+            
+            const messages = sseBuffer.split('\n\n');
+            sseBuffer = messages.pop() || '';
+            
+            for (const message of messages) {
+                const lines = message.split('\n');
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.substring(6));
+                            
+                            if (data.type === 'reasoning') {
+                                reasoningBuffer += data.content;
+                                reasoningDiv.innerHTML = formatMarkdown(reasoningBuffer) + '<span class="cursor-blink">▌</span>';
+                                reasoningDiv.scrollTop = reasoningDiv.scrollHeight;
+                            } else if (data.type === 'content') {
+                                if (!isAnswerPhase) {
+                                    isAnswerPhase = true;
+                                    reasoningDiv.innerHTML = formatMarkdown(reasoningBuffer);
+                                    answerDiv.innerHTML = '';
+                                }
+                                answerBuffer += data.content;
+                                answerDiv.innerHTML = formatMarkdown(answerBuffer) + '<span class="cursor-blink">▌</span>';
+                                answerDiv.scrollTop = answerDiv.scrollHeight;
+                            } else if (data.type === 'done') {
+                                streamingIndicator.style.display = 'none';
+                                btn.innerHTML = '<span>✅</span> Asked';
+                                
+                                // Remove cursor
+                                if (!isAnswerPhase) {
+                                    reasoningDiv.innerHTML = formatMarkdown(reasoningBuffer);
+                                }
+                                answerDiv.innerHTML = formatMarkdown(answerBuffer);
+                                
+                                // Clear input and reload history
+                                questionInput.value = '';
+                                loadQAHistory();
+                                
+                                // Reset button after delay
+                                setTimeout(() => {
+                                    btn.innerHTML = originalHTML;
+                                    btn.disabled = false;
+                                }, 1500);
+                            }
+                        } catch (e) {
+                            console.debug('Invalid SSE JSON:', line);
+                        }
+                    }
+                }
+            }
+        }
+        
+    } catch (error) {
+        console.error('Error asking question:', error);
+        streamingIndicator.style.display = 'none';
+        btn.innerHTML = '<span>❌</span> Error';
+        answerDiv.innerHTML = `<div class="error-text">Error: ${error.message}</div>`;
+        
+        setTimeout(() => {
+            btn.innerHTML = originalHTML;
+            btn.disabled = false;
+        }, 3000);
+    }
+}
+
+async function deleteQAEntry(index) {
+    if (!confirm(`确定要删除问题 Q${index + 1} 吗？`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/analysis/qa/entry/${encodeURIComponent(PAPER_TITLE)}/${index}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            loadQAHistory();
+        } else {
+            throw new Error('Failed to delete Q&A entry');
+        }
+    } catch (error) {
+        console.error('Error deleting Q&A entry:', error);
+        alert('删除失败，请重试。');
+    }
+}
+
+async function clearAllQA() {
+    if (!confirm('确定要删除所有Q&A记录吗？此操作不可恢复。')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/analysis/qa/delete/${encodeURIComponent(PAPER_TITLE)}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            document.getElementById('qaHistoryList').innerHTML = 
+                '<p class="qa-empty-message" id="qaEmptyMessage">No questions asked yet. Start by asking a question above!</p>';
+            document.getElementById('qaClearAllBtn').style.display = 'none';
+            document.getElementById('qaCurrentResponse').style.display = 'none';
+        } else {
+            throw new Error('Failed to clear Q&A');
+        }
+    } catch (error) {
+        console.error('Error clearing Q&A:', error);
+        alert('清除失败，请重试。');
+    }
 }
 </script>
 {% endblock %}

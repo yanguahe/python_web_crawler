@@ -15,6 +15,11 @@ class Settings(BaseSettings):
     app_port: int = 8000
     debug: bool = True
     
+    # Authentication Settings
+    auth_enabled: bool = True  # Enable/disable HTTP Basic Auth
+    auth_username: str = "admin"  # Default username
+    auth_password: str = "change_me_to_secure_password"  # Change this to a strong password
+    
     # arXiv API Settings
     arxiv_api_base_url: str = "https://export.arxiv.org/api/query"
     arxiv_max_results: int = 10

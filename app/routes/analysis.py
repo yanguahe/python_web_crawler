@@ -542,3 +542,177 @@ async def delete_fulltext_analysis(title: str) -> dict:
     else:
         raise HTTPException(status_code=404, detail="Fulltext analysis not found")
 
+
+# ==================== Q&A Session Endpoints ====================
+
+class QARequest(BaseModel):
+    """Request model for Q&A question."""
+    title: str
+    question: str
+
+
+@router.get("/qa/history/{title:path}", tags=["api"])
+async def get_qa_history(title: str) -> dict:
+    """
+    Get Q&A history for a paper.
+    """
+    decoded_title = unquote(title)
+    history = file_handler.get_qa_history(decoded_title)
+    
+    return {
+        "success": True,
+        "title": decoded_title,
+        "history": history,
+        "count": len(history)
+    }
+
+
+@router.post("/qa/ask/stream", tags=["api"])
+async def qa_ask_stream(request: QARequest):
+    """
+    Ask a question about a paper with streaming response.
+    Uses multi-turn conversation with history.
+    """
+    import asyncio
+    import json
+    import threading
+    
+    if not deepseek_client.is_configured():
+        raise HTTPException(
+            status_code=503,
+            detail="DeepSeek API is not configured. Please set DEEPSEEK_API_KEY."
+        )
+    
+    decoded_title = unquote(request.title)
+    
+    # Get paper text content
+    paper_content = file_handler.get_text_content(None, decoded_title)
+    if not paper_content:
+        raise HTTPException(
+            status_code=400,
+            detail="Paper text content not found. Please download and extract the PDF first."
+        )
+    
+    # Get existing Q&A history
+    history = file_handler.get_qa_messages_for_deepseek(decoded_title)
+    is_first_question = len(history) == 0
+    
+    async def generate():
+        yield f"data: {json.dumps({'type': 'start', 'title': decoded_title, 'question_index': len(history) // 2})}\n\n"
+        
+        reasoning_buffer = ""
+        content_buffer = ""
+        
+        # Use asyncio.Queue for better async compatibility
+        data_queue = asyncio.Queue()
+        loop = asyncio.get_event_loop()
+        
+        def run_stream():
+            """Run the sync generator in a thread."""
+            try:
+                for reasoning_chunk, content_chunk, is_reasoning in deepseek_client.qa_stream(
+                    question=request.question,
+                    paper_content=paper_content,
+                    history=history,
+                    is_first_question=is_first_question
+                ):
+                    # Put data into async queue from thread
+                    asyncio.run_coroutine_threadsafe(
+                        data_queue.put((reasoning_chunk, content_chunk, is_reasoning)),
+                        loop
+                    )
+            finally:
+                # Signal completion
+                asyncio.run_coroutine_threadsafe(data_queue.put(None), loop)
+        
+        # Start the streaming in a background thread
+        thread = threading.Thread(target=run_stream, daemon=True)
+        thread.start()
+        
+        # Consume from queue and yield SSE events immediately
+        while True:
+            item = await data_queue.get()
+            
+            if item is None:
+                break
+            
+            reasoning_chunk, content_chunk, is_reasoning = item
+            
+            if is_reasoning and reasoning_chunk:
+                reasoning_buffer += reasoning_chunk
+                yield f"data: {json.dumps({'type': 'reasoning', 'content': reasoning_chunk})}\n\n"
+            elif content_chunk:
+                content_buffer += content_chunk
+                yield f"data: {json.dumps({'type': 'content', 'content': content_chunk})}\n\n"
+        
+        # Wait for thread to finish
+        thread.join(timeout=5)
+        
+        # Save Q&A entry when streaming is complete
+        entry_index = -1
+        if content_buffer:
+            try:
+                entry_index = file_handler.save_qa_entry(
+                    decoded_title,
+                    request.question,
+                    reasoning_buffer,
+                    content_buffer
+                )
+            except Exception as e:
+                print(f"Error saving Q&A entry: {e}")
+        
+        yield f"data: {json.dumps({'type': 'done', 'title': decoded_title, 'entry_index': entry_index, 'saved': entry_index >= 0})}\n\n"
+    
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+            "Content-Type": "text/event-stream; charset=utf-8"
+        }
+    )
+
+
+@router.delete("/qa/entry/{title:path}/{index}", tags=["api"])
+async def delete_qa_entry(title: str, index: int) -> dict:
+    """
+    Delete a specific Q&A entry.
+    """
+    decoded_title = unquote(title)
+    
+    if file_handler.delete_qa_entry(decoded_title, index):
+        return {"success": True, "message": f"Q&A entry {index} deleted"}
+    else:
+        raise HTTPException(status_code=404, detail="Q&A entry not found")
+
+
+@router.delete("/qa/delete/{title:path}", tags=["api"])
+async def delete_qa_session(title: str) -> dict:
+    """
+    Delete entire Q&A session for a paper.
+    """
+    decoded_title = unquote(title)
+    
+    if file_handler.delete_qa(decoded_title):
+        return {"success": True, "message": f"Q&A session for '{decoded_title}' deleted"}
+    else:
+        return {"success": False, "message": "Q&A session not found"}
+
+
+@router.get("/qa/exists/{title:path}", tags=["api"])
+async def check_qa_exists(title: str) -> dict:
+    """
+    Check if Q&A session exists for a paper.
+    """
+    decoded_title = unquote(title)
+    exists = file_handler.qa_exists(decoded_title)
+    history = file_handler.get_qa_history(decoded_title) if exists else []
+    
+    return {
+        "title": decoded_title,
+        "exists": exists,
+        "count": len(history)
+    }
+

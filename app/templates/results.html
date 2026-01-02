@@ -113,7 +113,7 @@
                     <span>💾</span> Save
                 </button>
                 <!-- Download PDF to Server Button -->
-                <button class="action-btn download-btn" onclick="downloadPdfToServer('{{ paper.id }}', '{{ paper.title | e }}')" data-download-id="{{ paper.id }}" data-paper-title="{{ paper.title | e }}">
+                <button class="action-btn download-btn" onclick='downloadPdfToServer("{{ paper.id }}", {{ paper.title | tojson }})' data-download-id="{{ paper.id }}" data-paper-title="{{ paper.title | e }}">
                     <span>⬇️</span> Download PDF & Extract Text
                 </button>
                 <!-- PDF/TXT Status Indicators (hidden by default, shown via JS) -->
@@ -124,16 +124,16 @@
                     <span>📝</span> TXT
                 </span>
                 <!-- Delete PDF/TXT Button (hidden by default) -->
-                <button class="action-btn delete-pdf-btn" onclick="deletePdfTxt('{{ paper.id }}', '{{ paper.title | e }}')" data-delete-pdf-id="{{ paper.id }}" style="display: none;">
+                <button class="action-btn delete-pdf-btn" onclick='deletePdfTxt("{{ paper.id }}", {{ paper.title | tojson }})' data-delete-pdf-id="{{ paper.id }}" style="display: none;">
                     <span>🗑️</span> Delete PDF/TXT
                 </button>
-                <button class="action-btn analyze-btn" onclick="analyzePaper('{{ paper.id }}', '{{ paper.title | e }}', `{{ paper.abstract | e }}`)" data-analyze-id="{{ paper.id }}">
+                <button class="action-btn analyze-btn" onclick='analyzePaper("{{ paper.id }}", {{ paper.title | tojson }}, {{ paper.abstract | tojson }})' data-analyze-id="{{ paper.id }}">
                     <span>🤖</span> Analyze
                 </button>
                 <a href="#" class="action-btn view-analysis-btn" data-title="{{ paper.title | e }}" style="display: none;" target="_blank">
                     <span>🌐</span> View Analysis
                 </a>
-                <button class="action-btn delete-analysis-btn" onclick="deleteAnalysis('{{ paper.title | e }}')" data-analysis-title="{{ paper.title | e }}" style="display: none;">
+                <button class="action-btn delete-analysis-btn" onclick='deleteAnalysis({{ paper.title | tojson }})' data-analysis-title="{{ paper.title | e }}" style="display: none;">
                     <span>🧹</span> Delete Analysis
                 </button>
             </div>
@@ -397,10 +397,11 @@ async function analyzePaper(paperId, title, abstract) {
                                     contentDiv.innerHTML = '';
                                 }
                                 contentBuffer += data.content;
-                                contentDiv.innerHTML = `<div class="analysis-preview"><pre class="html-stream" id="htmlStream-${paperId}">${escapeHtml(contentBuffer)}<span class="cursor-blink">▌</span></pre></div>`;
-                                const preEl = document.getElementById(`htmlStream-${paperId}`);
-                                if (preEl) {
-                                    preEl.scrollTop = preEl.scrollHeight;
+                                contentDiv.innerHTML = `<div class="analysis-preview" id="previewBox-${paperId}"><pre class="html-stream">${escapeHtml(contentBuffer)}<span class="cursor-blink">▌</span></pre></div>`;
+                                // Auto-scroll the analysis-preview container
+                                const previewBox = document.getElementById(`previewBox-${paperId}`);
+                                if (previewBox) {
+                                    previewBox.scrollTop = previewBox.scrollHeight;
                                 }
                             } else if (data.type === 'done') {
                                 btn.innerHTML = '<span>✅</span> Analyzed';

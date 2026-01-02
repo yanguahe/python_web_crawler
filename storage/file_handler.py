@@ -661,4 +661,164 @@ class FileHandler:
             deleted = True
         
         return deleted
+    
+    # ==================== Q&A Session Methods ====================
+    
+    @property
+    def qa_dir(self) -> Path:
+        """Get the Q&A storage directory."""
+        qa_path = self.data_dir.parent / "qa"
+        qa_path.mkdir(parents=True, exist_ok=True)
+        return qa_path
+    
+    def _get_qa_filename(self, title: str) -> str:
+        """Generate Q&A session filename from paper title."""
+        safe_title = self._sanitize_filename(title, max_length=80)
+        return f"{safe_title}_qa_session.json"
+    
+    def _get_qa_path(self, title: str) -> Path:
+        """Get the file path for a Q&A session file."""
+        filename = self._get_qa_filename(title)
+        return self.qa_dir / filename
+    
+    def get_qa_history(self, title: str) -> List[dict]:
+        """
+        Get Q&A history for a paper.
+        
+        Args:
+            title: Paper title
+            
+        Returns:
+            List of Q&A pairs, each containing:
+            - question: str
+            - reasoning: str
+            - answer: str
+            - timestamp: str (ISO format)
+        """
+        file_path = self._get_qa_path(title)
+        if not file_path.exists():
+            return []
+        
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, ValueError):
+            return []
+    
+    def save_qa_entry(self, title: str, question: str, reasoning: str, answer: str) -> int:
+        """
+        Save a new Q&A entry for a paper.
+        
+        Args:
+            title: Paper title
+            question: User's question
+            reasoning: DeepSeek's reasoning content
+            answer: DeepSeek's answer content
+            
+        Returns:
+            Index of the new entry (0-based)
+        """
+        history = self.get_qa_history(title)
+        
+        entry = {
+            "question": question,
+            "reasoning": reasoning,
+            "answer": answer,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        history.append(entry)
+        
+        file_path = self._get_qa_path(title)
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(history, f, ensure_ascii=False, indent=2)
+        
+        return len(history) - 1
+    
+    def update_qa_entry(self, title: str, index: int, reasoning: str, answer: str) -> bool:
+        """
+        Update an existing Q&A entry (used during streaming).
+        
+        Args:
+            title: Paper title
+            index: Entry index to update
+            reasoning: Updated reasoning content
+            answer: Updated answer content
+            
+        Returns:
+            True if updated, False if index not found
+        """
+        history = self.get_qa_history(title)
+        
+        if index < 0 or index >= len(history):
+            return False
+        
+        history[index]["reasoning"] = reasoning
+        history[index]["answer"] = answer
+        
+        file_path = self._get_qa_path(title)
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(history, f, ensure_ascii=False, indent=2)
+        
+        return True
+    
+    def qa_exists(self, title: str) -> bool:
+        """Check if Q&A session exists for a paper."""
+        return self._get_qa_path(title).exists()
+    
+    def delete_qa(self, title: str) -> bool:
+        """Delete Q&A session for a paper."""
+        file_path = self._get_qa_path(title)
+        if file_path.exists():
+            file_path.unlink()
+            return True
+        return False
+    
+    def delete_qa_entry(self, title: str, index: int) -> bool:
+        """
+        Delete a specific Q&A entry.
+        
+        Args:
+            title: Paper title
+            index: Entry index to delete
+            
+        Returns:
+            True if deleted, False if index not found
+        """
+        history = self.get_qa_history(title)
+        
+        if index < 0 or index >= len(history):
+            return False
+        
+        history.pop(index)
+        
+        file_path = self._get_qa_path(title)
+        if history:
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(history, f, ensure_ascii=False, indent=2)
+        else:
+            # Delete file if no entries left
+            file_path.unlink()
+        
+        return True
+    
+    def get_qa_messages_for_deepseek(self, title: str) -> List[dict]:
+        """
+        Get Q&A history formatted for DeepSeek API multi-turn conversation.
+        
+        Args:
+            title: Paper title
+            
+        Returns:
+            List of messages in DeepSeek format:
+            [{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}, ...]
+        """
+        history = self.get_qa_history(title)
+        messages = []
+        
+        for entry in history:
+            messages.append({"role": "user", "content": entry["question"]})
+            messages.append({"role": "assistant", "content": entry["answer"]})
+        
+        return messages
 

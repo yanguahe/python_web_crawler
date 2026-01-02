@@ -105,6 +105,8 @@ venv.bak/
 *.swp
 *.swo
 
+*.diff
+
 # Project specific
 data/papers/*.json
 !data/papers/.gitkeep
@@ -118,6 +120,9 @@ data/texts/*.txt
 data/analysis/*.html
 data/analysis/*.txt
 !data/analysis/.gitkeep
+
+data/qa/*.json
+!data/qa/.gitkeep
 
 data/backups/
 
