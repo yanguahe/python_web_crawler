@@ -34,6 +34,24 @@
         </div>
     </div>
     
+    <!-- PDF Upload Section -->
+    <div class="upload-section" style="display: flex; gap: 12px; margin-bottom: 20px; padding: 16px; background: rgba(46, 160, 67, 0.1); border-radius: 8px; border: 1px solid rgba(46, 160, 67, 0.3); align-items: center; flex-wrap: wrap;">
+        <span style="color: #8b949e; margin-right: 8px;">📄 Upload PDF:</span>
+        <input type="file" id="pdfUploadFile" accept=".pdf" style="display: none;" onchange="handlePdfUpload(this)">
+        <button id="pdfUploadBtn" onclick="document.getElementById('pdfUploadFile').click()" class="action-btn" style="padding: 8px 16px; background: rgba(46, 160, 67, 0.2); border: 1px solid rgba(46, 160, 67, 0.5); color: #3fb950;">
+            <span>📤</span> Select PDF
+        </button>
+        <div id="pdfUploadProgressWrapper" style="display: none; flex-direction: column; gap: 4px; min-width: 200px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <div id="pdfUploadProgressBar" style="flex: 1; height: 8px; background: #21262d; border-radius: 4px; overflow: hidden;">
+                    <div id="pdfUploadProgressFill" style="width: 0%; height: 100%; background: linear-gradient(90deg, #238636, #3fb950); transition: width 0.2s ease;"></div>
+                </div>
+                <span id="pdfUploadProgressText" style="color: #8b949e; font-size: 0.85em; min-width: 45px;">0%</span>
+            </div>
+            <span id="pdfUploadStatus" style="color: #8b949e; font-size: 0.85em;"></span>
+        </div>
+    </div>
+    
     <!-- Backup Actions -->
     <div class="backup-section" style="display: flex; gap: 12px; margin-bottom: 20px; padding: 16px; background: rgba(88, 166, 255, 0.1); border-radius: 8px; border: 1px solid rgba(88, 166, 255, 0.2); align-items: center; flex-wrap: wrap;">
         <span style="color: #8b949e; margin-right: 8px;">📦 Data Backup:</span>
@@ -353,6 +371,108 @@ async function importSelectedBackup() {
 }
 
 // ==================== End Backup Functions ====================
+
+// ==================== PDF Upload Functions ====================
+
+function handlePdfUpload(input) {
+    const file = input.files[0];
+    if (!file) return;
+    
+    // Validate file type
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+        alert('Please select a valid PDF file');
+        input.value = '';
+        return;
+    }
+    
+    const btn = document.getElementById('pdfUploadBtn');
+    const progressWrapper = document.getElementById('pdfUploadProgressWrapper');
+    const progressFill = document.getElementById('pdfUploadProgressFill');
+    const progressText = document.getElementById('pdfUploadProgressText');
+    const statusEl = document.getElementById('pdfUploadStatus');
+    const originalHTML = btn.innerHTML;
+    
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳</span> Uploading...';
+    progressWrapper.style.display = 'flex';
+    progressFill.style.width = '0%';
+    progressFill.style.background = 'linear-gradient(90deg, #238636, #3fb950)';
+    progressText.textContent = '0%';
+    statusEl.textContent = `Uploading ${file.name}...`;
+    statusEl.style.color = '#8b949e';
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const xhr = new XMLHttpRequest();
+    
+    // Track upload progress
+    xhr.upload.addEventListener('progress', function(e) {
+        if (e.lengthComputable) {
+            const percentComplete = Math.round((e.loaded / e.total) * 100);
+            progressFill.style.width = percentComplete + '%';
+            progressText.textContent = percentComplete + '%';
+            
+            if (percentComplete < 100) {
+                statusEl.textContent = `Uploading: ${(e.loaded / 1024 / 1024).toFixed(1)} / ${(e.total / 1024 / 1024).toFixed(1)} MB`;
+            } else {
+                statusEl.textContent = 'Processing PDF (extracting text)...';
+                btn.innerHTML = '<span>⏳</span> Processing...';
+                progressFill.style.background = 'linear-gradient(90deg, #388bfd, #58a6ff)';
+            }
+        }
+    });
+    
+    xhr.addEventListener('load', function() {
+        try {
+            const data = JSON.parse(xhr.responseText);
+            
+            if (xhr.status === 200 && data.success) {
+                progressFill.style.width = '100%';
+                progressFill.style.background = 'linear-gradient(90deg, #238636, #3fb950)';
+                btn.innerHTML = '<span>✅</span> Done!';
+                statusEl.innerHTML = `<span style="color: #3fb950;">✅ ${data.message}</span>`;
+                
+                // Reload page to show the new paper
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                throw new Error(data.detail || 'Failed to upload PDF');
+            }
+        } catch (error) {
+            handlePdfUploadError(error.message, btn, statusEl, progressFill, progressWrapper, originalHTML);
+        }
+    });
+    
+    xhr.addEventListener('error', function() {
+        handlePdfUploadError('Network error occurred', btn, statusEl, progressFill, progressWrapper, originalHTML);
+    });
+    
+    xhr.addEventListener('abort', function() {
+        handlePdfUploadError('Upload cancelled', btn, statusEl, progressFill, progressWrapper, originalHTML);
+    });
+    
+    xhr.open('POST', '/papers/api/upload-pdf');
+    xhr.send(formData);
+    
+    // Reset file input
+    input.value = '';
+}
+
+function handlePdfUploadError(message, btn, statusEl, progressFill, progressWrapper, originalHTML) {
+    console.error('Error uploading PDF:', message);
+    btn.innerHTML = '<span>❌</span> Error';
+    statusEl.textContent = 'Error: ' + message;
+    statusEl.style.color = '#f85149';
+    progressFill.style.background = '#f85149';
+    
+    setTimeout(() => {
+        btn.innerHTML = originalHTML;
+        btn.disabled = false;
+        progressWrapper.style.display = 'none';
+    }, 3000);
+}
+
+// ==================== End PDF Upload Functions ====================
 
 async function deleteAnalysis(title) {
     if (!confirm('确定要删除这篇论文的分析结果吗？')) {

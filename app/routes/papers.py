@@ -8,11 +8,13 @@ from pathlib import Path
 from typing import Optional, List
 from urllib.parse import unquote
 
-from fastapi import APIRouter, Request, HTTPException, Query
+import re
+from fastapi import APIRouter, Request, HTTPException, Query, UploadFile, File
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 
 from crawler import ArxivClient
+from crawler.models import Paper
 from storage import FileHandler
 from config import settings
 
@@ -340,6 +342,215 @@ async def api_import_backup(filename: str):
         if 'temp_extract_dir' in locals() and temp_extract_dir.exists():
             shutil.rmtree(temp_extract_dir)
         raise HTTPException(status_code=500, detail=f"Failed to import backup: {str(e)}")
+
+
+@router.post("/api/upload-pdf", tags=["api"])
+async def api_upload_pdf(file: UploadFile = File(...)):
+    """
+    Upload a PDF file, extract text, parse title/abstract, and create a paper record.
+    """
+    # Validate file type
+    if not file.filename.lower().endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="Only PDF files are accepted")
+    
+    try:
+        import fitz  # PyMuPDF
+        
+        # Generate a unique ID for this uploaded paper (using timestamp + filename)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        base_name = Path(file.filename).stem
+        paper_id = f"upload_{timestamp}_{base_name[:30]}"
+        
+        # Save the uploaded PDF
+        pdf_filename = f"{file_handler._sanitize_filename(base_name)}.pdf"
+        pdf_path = file_handler.pdf_dir / pdf_filename
+        
+        # Write PDF file in chunks
+        CHUNK_SIZE = 1024 * 1024  # 1MB chunks
+        with open(pdf_path, "wb") as buffer:
+            while True:
+                chunk = await file.read(CHUNK_SIZE)
+                if not chunk:
+                    break
+                buffer.write(chunk)
+        
+        # Extract text from PDF
+        doc = fitz.open(pdf_path)
+        full_text = []
+        for page_num in range(len(doc)):
+            page = doc[page_num]
+            text = page.get_text()
+            if text.strip():
+                full_text.append(f"--- Page {page_num + 1} ---\n")
+                full_text.append(text)
+                full_text.append("\n")
+        doc.close()
+        
+        text_content = "".join(full_text)
+        
+        # Save text file
+        text_filename = f"{file_handler._sanitize_filename(base_name)}.txt"
+        text_path = file_handler.text_dir / text_filename
+        with open(text_path, "w", encoding="utf-8") as f:
+            f.write(text_content)
+        
+        # Parse title from text
+        title = _parse_title_from_text(text_content, base_name)
+        
+        # Parse abstract from text
+        abstract = _parse_abstract_from_text(text_content)
+        
+        # Create Paper object
+        paper = Paper(
+            id=paper_id,
+            title=title,
+            authors=[],  # Cannot reliably extract authors
+            abstract=abstract,
+            categories=["uploaded"],
+            published=datetime.now(),
+            updated=None,
+            pdf_url=f"/papers/api/pdf/{paper_id}",
+            arxiv_url=""
+        )
+        
+        # Save paper record
+        file_handler.save_paper(paper)
+        
+        # Rename files to use the parsed title
+        safe_title = file_handler._sanitize_filename(title)
+        
+        # Rename PDF if title is different from original filename
+        if safe_title != file_handler._sanitize_filename(base_name):
+            new_pdf_path = file_handler.pdf_dir / f"{safe_title}.pdf"
+            if not new_pdf_path.exists():
+                pdf_path.rename(new_pdf_path)
+            
+            new_text_path = file_handler.text_dir / f"{safe_title}.txt"
+            if not new_text_path.exists():
+                text_path.rename(new_text_path)
+        
+        return {
+            "success": True,
+            "message": f"Paper '{title[:50]}...' added successfully" if len(title) > 50 else f"Paper '{title}' added successfully",
+            "paper_id": paper_id,
+            "title": title
+        }
+        
+    except ImportError:
+        raise HTTPException(status_code=500, detail="PyMuPDF (fitz) is not installed")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to process PDF: {str(e)}")
+
+
+def _parse_title_from_text(text: str, fallback_name: str) -> str:
+    """
+    Parse title from extracted PDF text.
+    
+    Rules:
+    1. Find text between "--- Page 1 ---" and "Abstract" (case-insensitive)
+    2. If no "Abstract" found, use first 3 lines after "--- Page 1 ---"
+    """
+    lines = text.split('\n')
+    
+    # Find "--- Page 1 ---" position
+    page1_idx = -1
+    for i, line in enumerate(lines):
+        if '--- Page 1 ---' in line:
+            page1_idx = i
+            break
+    
+    if page1_idx == -1:
+        return fallback_name
+    
+    # Find "Abstract" position (case-insensitive)
+    abstract_idx = -1
+    for i in range(page1_idx + 1, min(page1_idx + 50, len(lines))):
+        if re.search(r'\babstract\b', lines[i], re.IGNORECASE):
+            abstract_idx = i
+            break
+    
+    # Extract title lines
+    if abstract_idx != -1:
+        # Get lines between Page 1 and Abstract
+        title_lines = lines[page1_idx + 1:abstract_idx]
+    else:
+        # Get first 3 non-empty lines after Page 1
+        title_lines = []
+        for i in range(page1_idx + 1, min(page1_idx + 20, len(lines))):
+            line = lines[i].strip()
+            if line and not line.startswith('---'):
+                title_lines.append(line)
+                if len(title_lines) >= 3:
+                    break
+    
+    # Clean and join title lines
+    title_parts = []
+    for line in title_lines:
+        line = line.strip()
+        # Skip page markers and empty lines
+        if line and not line.startswith('--- Page'):
+            # Skip lines that look like author names or emails
+            if '@' not in line and not re.match(r'^[\d\s,]+$', line):
+                title_parts.append(line)
+    
+    if not title_parts:
+        return fallback_name
+    
+    # Join and clean up the title
+    title = ' '.join(title_parts[:3])  # Limit to first 3 meaningful lines
+    title = re.sub(r'\s+', ' ', title).strip()
+    
+    # Remove trailing numbers, asterisks, etc.
+    title = re.sub(r'[\*†‡§¶]+$', '', title).strip()
+    
+    return title if title else fallback_name
+
+
+def _parse_abstract_from_text(text: str) -> str:
+    """
+    Parse abstract from extracted PDF text.
+    
+    Rules:
+    1. If both "Abstract" and "Introduction" exist (case-insensitive)
+    2. Extract text between first "Abstract" and first "Introduction"
+    3. Remove page markers like "--- Page num ---"
+    """
+    text_lower = text.lower()
+    
+    # Find Abstract position
+    abstract_match = re.search(r'\babstract\b', text_lower)
+    if not abstract_match:
+        return "Abstract not found in document."
+    
+    # Find Introduction position
+    intro_match = re.search(r'\bintroduction\b', text_lower)
+    if not intro_match:
+        # No Introduction found, try to get some text after Abstract
+        abstract_start = abstract_match.end()
+        # Get up to 2000 characters after Abstract
+        abstract_text = text[abstract_start:abstract_start + 2000]
+        # Clean up
+        abstract_text = re.sub(r'--- Page \d+ ---', '', abstract_text)
+        abstract_text = re.sub(r'\s+', ' ', abstract_text).strip()
+        return abstract_text[:1500] if abstract_text else "Abstract not found in document."
+    
+    # Check that Introduction comes after Abstract
+    if intro_match.start() <= abstract_match.end():
+        return "Abstract not found in document."
+    
+    # Extract text between Abstract and Introduction
+    abstract_text = text[abstract_match.end():intro_match.start()]
+    
+    # Remove page markers
+    abstract_text = re.sub(r'--- Page \d+ ---', '', abstract_text)
+    
+    # Clean up whitespace
+    abstract_text = re.sub(r'\s+', ' ', abstract_text).strip()
+    
+    # Remove leading numbers or special characters
+    abstract_text = re.sub(r'^[\d\.\s]+', '', abstract_text).strip()
+    
+    return abstract_text if abstract_text else "Abstract not found in document."
 
 
 @router.get("/api/pdf/{paper_id:path}", tags=["api"])
