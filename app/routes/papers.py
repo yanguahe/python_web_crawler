@@ -227,6 +227,121 @@ async def api_delete_backup(filename: str):
     return {"success": True, "message": f"Backup {filename} deleted"}
 
 
+@router.post("/api/backup/import/{filename}", tags=["api"])
+async def api_import_backup(filename: str):
+    """
+    Import a backup file from data/backups/ and merge it with existing data.
+    The backup tar.gz file should contain the data directory structure.
+    """
+    # Validate filename to prevent directory traversal
+    if "/" in filename or "\\" in filename or ".." in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    
+    if not filename.endswith('.tar.gz') and not filename.endswith('.tgz'):
+        raise HTTPException(status_code=400, detail="Invalid file format. Only .tar.gz or .tgz files are accepted.")
+    
+    # Check if backup file exists
+    backup_path = BACKUP_DIR / filename
+    if not backup_path.exists():
+        raise HTTPException(status_code=404, detail=f"Backup file not found: {filename}")
+    
+    try:
+        # Create a temporary directory for extraction
+        temp_extract_dir = BACKUP_DIR / f"temp_extract_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        temp_extract_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Extract the tar.gz file from the existing backup
+        with tarfile.open(backup_path, "r:gz") as tar:
+            tar.extractall(temp_extract_dir)
+        
+        # Find the data directory in the extracted content
+        # The backup structure is: data_backup_YYYYMMDD_HHMMSS/papers/, data_backup_YYYYMMDD_HHMMSS/pdfs/, etc.
+        extracted_items = list(temp_extract_dir.iterdir())
+        
+        if len(extracted_items) == 1 and extracted_items[0].is_dir():
+            # Single directory containing the backup data
+            source_base = extracted_items[0]
+        else:
+            # Multiple items at root level
+            source_base = temp_extract_dir
+        
+        # Merge the extracted data with existing data
+        imported_counts = {"papers": 0, "pdfs": 0, "texts": 0, "analysis": 0, "qa": 0}
+        
+        for subdir in source_base.iterdir():
+            if not subdir.is_dir():
+                continue
+            
+            subdir_name = subdir.name
+            
+            # Map backup subdirectories to actual data directories
+            if subdir_name == "papers":
+                dest_dir = DATA_ROOT / "papers"
+            elif subdir_name == "pdfs":
+                dest_dir = DATA_ROOT / "pdfs"
+            elif subdir_name == "texts":
+                dest_dir = DATA_ROOT / "texts"
+            elif subdir_name == "analysis":
+                dest_dir = DATA_ROOT / "analysis"
+            elif subdir_name == "qa":
+                dest_dir = DATA_ROOT / "qa"
+            else:
+                # Skip unknown directories (like backups)
+                continue
+            
+            # Ensure destination directory exists
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Copy files from backup to destination
+            for item in subdir.iterdir():
+                dest_path = dest_dir / item.name
+                if item.is_file():
+                    shutil.copy2(item, dest_path)
+                    if subdir_name in imported_counts:
+                        imported_counts[subdir_name] += 1
+                elif item.is_dir():
+                    if dest_path.exists():
+                        shutil.rmtree(dest_path)
+                    shutil.copytree(item, dest_path)
+                    if subdir_name in imported_counts:
+                        imported_counts[subdir_name] += 1
+        
+        # Cleanup: remove temp extraction directory (keep original backup file)
+        shutil.rmtree(temp_extract_dir)
+        
+        # Build result message
+        message_parts = []
+        if imported_counts["papers"] > 0:
+            message_parts.append(f"{imported_counts['papers']} papers")
+        if imported_counts["pdfs"] > 0:
+            message_parts.append(f"{imported_counts['pdfs']} PDFs")
+        if imported_counts["texts"] > 0:
+            message_parts.append(f"{imported_counts['texts']} texts")
+        if imported_counts["analysis"] > 0:
+            message_parts.append(f"{imported_counts['analysis']} analyses")
+        if imported_counts["qa"] > 0:
+            message_parts.append(f"{imported_counts['qa']} Q&A sessions")
+        
+        message = "Imported: " + ", ".join(message_parts) if message_parts else "No data imported"
+        
+        return {
+            "success": True,
+            "message": message,
+            "imported": imported_counts
+        }
+        
+    except tarfile.TarError as e:
+        # Cleanup on error
+        if temp_extract_dir.exists():
+            shutil.rmtree(temp_extract_dir)
+        raise HTTPException(status_code=400, detail=f"Invalid tar.gz file: {str(e)}")
+    except Exception as e:
+        # Cleanup on error
+        if 'temp_extract_dir' in locals() and temp_extract_dir.exists():
+            shutil.rmtree(temp_extract_dir)
+        raise HTTPException(status_code=500, detail=f"Failed to import backup: {str(e)}")
+
+
 @router.get("/api/pdf/{paper_id:path}", tags=["api"])
 async def api_get_pdf(paper_id: str, title: Optional[str] = Query(None)):
     """

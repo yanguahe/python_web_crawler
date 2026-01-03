@@ -1,5 +1,109 @@
 {% extends "base.html" %}
 
+{% block head %}
+<!-- KaTeX for math rendering (BootCDN - China accessible) -->
+<link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<!-- Highlight.js for code syntax highlighting (BootCDN - China accessible) -->
+<link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+<style>
+/* Enhanced Markdown Rendering Styles */
+.rendered-markdown {
+    line-height: 1.7;
+    color: #c9d1d9;
+}
+.rendered-markdown h1, .rendered-markdown h2, .rendered-markdown h3,
+.rendered-markdown h4, .rendered-markdown h5, .rendered-markdown h6 {
+    margin-top: 1.2em;
+    margin-bottom: 0.6em;
+    font-weight: 600;
+    line-height: 1.3;
+}
+.rendered-markdown h1 { font-size: 1.6em; color: #58a6ff; border-bottom: 1px solid #30363d; padding-bottom: 0.3em; }
+.rendered-markdown h2 { font-size: 1.4em; color: #58a6ff; border-bottom: 1px solid #30363d; padding-bottom: 0.3em; }
+.rendered-markdown h3 { font-size: 1.25em; color: #79c0ff; }
+.rendered-markdown h4 { font-size: 1.1em; color: #a5d6ff; }
+.rendered-markdown h5 { font-size: 1em; color: #d2a8ff; }
+.rendered-markdown h6 { font-size: 0.9em; color: #8b949e; }
+.rendered-markdown p { margin: 0.8em 0; }
+.rendered-markdown strong { color: #58a6ff; font-weight: 600; }
+.rendered-markdown em { color: #d2a8ff; font-style: italic; }
+.rendered-markdown code {
+    background: rgba(110, 118, 129, 0.3);
+    padding: 0.2em 0.4em;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.9em;
+    color: #f0883e;
+}
+.rendered-markdown pre {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 1em;
+    overflow-x: auto;
+    margin: 1em 0;
+}
+.rendered-markdown pre code {
+    background: transparent;
+    padding: 0;
+    color: #c9d1d9;
+    font-size: 0.9em;
+}
+.rendered-markdown blockquote {
+    border-left: 4px solid #8957e5;
+    background: rgba(137, 87, 229, 0.1);
+    padding: 0.5em 1em;
+    margin: 1em 0;
+    color: #d2a8ff;
+}
+.rendered-markdown ul, .rendered-markdown ol {
+    padding-left: 1.5em;
+    margin: 0.8em 0;
+}
+.rendered-markdown li {
+    margin: 0.4em 0;
+}
+.rendered-markdown ul li::marker { color: #58a6ff; }
+.rendered-markdown ol li::marker { color: #d2a8ff; font-weight: 600; }
+.rendered-markdown table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1em 0;
+}
+.rendered-markdown th, .rendered-markdown td {
+    border: 1px solid #30363d;
+    padding: 0.6em 1em;
+    text-align: left;
+}
+.rendered-markdown th {
+    background: #21262d;
+    color: #58a6ff;
+    font-weight: 600;
+}
+.rendered-markdown tr:nth-child(even) { background: rgba(110, 118, 129, 0.1); }
+.rendered-markdown hr {
+    border: none;
+    border-top: 1px solid #30363d;
+    margin: 1.5em 0;
+}
+.rendered-markdown a {
+    color: #58a6ff;
+    text-decoration: none;
+}
+.rendered-markdown a:hover { text-decoration: underline; }
+/* KaTeX math styling */
+.rendered-markdown .katex { font-size: 1.1em; }
+.rendered-markdown .katex-display {
+    background: rgba(88, 166, 255, 0.05);
+    border: 1px solid rgba(88, 166, 255, 0.2);
+    border-radius: 6px;
+    padding: 1em;
+    margin: 1em 0;
+    overflow-x: auto;
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="paper-detail-container">
     <!-- Back Navigation -->
@@ -364,6 +468,15 @@
 {% endblock %}
 
 {% block scripts %}
+<!-- Markdown & Math rendering libraries (BootCDN - China accessible) -->
+<script src="https://cdn.bootcdn.net/ajax/libs/marked/12.0.0/marked.min.js"></script>
+<script src="https://cdn.bootcdn.net/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script src="https://cdn.bootcdn.net/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdn.bootcdn.net/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+<script src="https://cdn.bootcdn.net/ajax/libs/highlight.js/11.9.0/languages/javascript.min.js"></script>
+<script src="https://cdn.bootcdn.net/ajax/libs/highlight.js/11.9.0/languages/bash.min.js"></script>
+<script src="https://cdn.bootcdn.net/ajax/libs/highlight.js/11.9.0/languages/json.min.js"></script>
+
 <!-- Store data in hidden elements to avoid JavaScript parsing issues -->
 <script type="application/json" id="paper-title-data">{{ paper.title | tojson | safe }}</script>
 {% if text_content %}
@@ -1077,146 +1190,156 @@ async function deleteAnalysis() {
     }
 }
 
-function formatMarkdown(text) {
-    if (!text) return '';
+// Initialize marked.js with custom renderer for math support
+function initMarkedRenderer() {
+    if (typeof marked === 'undefined') {
+        console.warn('marked.js not loaded, using fallback renderer');
+        return false;
+    }
     
-    let html = text;
+    // Custom renderer for better styling
+    const renderer = new marked.Renderer();
     
-    // Protect math expressions first - wrap in special markers
-    // LaTeX style: $...$ or $$...$$
-    const mathPlaceholders = [];
-    html = html.replace(/\$\$([\s\S]*?)\$\$/g, function(match, math) {
-        mathPlaceholders.push({ type: 'block', content: math });
-        return `@@MATH_BLOCK_${mathPlaceholders.length - 1}@@`;
+    // Custom code block renderer with syntax highlighting
+    renderer.code = function(code, language) {
+        let highlighted = code;
+        if (typeof hljs !== 'undefined' && language && hljs.getLanguage(language)) {
+            try {
+                highlighted = hljs.highlight(code, { language: language }).value;
+            } catch (e) {
+                highlighted = code;
+            }
+        }
+        return `<pre><code class="hljs language-${language || 'plaintext'}">${highlighted}</code></pre>`;
+    };
+    
+    marked.setOptions({
+        renderer: renderer,
+        gfm: true,
+        breaks: true,
+        pedantic: false
     });
-    html = html.replace(/\$([^\$\n]+)\$/g, function(match, math) {
-        mathPlaceholders.push({ type: 'inline', content: math });
-        return `@@MATH_INLINE_${mathPlaceholders.length - 1}@@`;
-    });
     
-    // Code blocks (```...```) - must be processed first
-    html = html.replace(/```(\w*)\n?([\s\S]*?)```/g, function(match, lang, code) {
-        const escapedCode = code.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        return `<pre class="md-code-block"><code class="lang-${lang || 'text'}">${escapedCode.trim()}</code></pre>`;
-    });
+    return true;
+}
+
+// Render LaTeX math using KaTeX
+function renderMath(text) {
+    if (typeof katex === 'undefined') {
+        return text;
+    }
     
-    // Inline code (`...`) - protects content inside from other formatting
-    html = html.replace(/`([^`]+)`/g, '<code class="md-inline-code">$1</code>');
-    
-    // Headers (must process before other line-based rules)
-    html = html.replace(/^#### (.*?)$/gm, '<h6 class="md-h6">$1</h6>');
-    html = html.replace(/^### (.*?)$/gm, '<h5 class="md-h5">$1</h5>');
-    html = html.replace(/^## (.*?)$/gm, '<h4 class="md-h4">$1</h4>');
-    html = html.replace(/^# (.*?)$/gm, '<h3 class="md-h3">$1</h3>');
-    
-    // Bold: **text** or __text__ (but not inside words)
-    html = html.replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>');
-    html = html.replace(/\*\*([^*]+)\*\*/g, '<strong class="md-bold">$1</strong>');
-    // Only match __text__ at word boundaries to avoid matching variable names
-    html = html.replace(/(^|[\s\(])__([^_]+)__([\s\)\.,;:!?]|$)/g, '$1<strong class="md-bold">$2</strong>$3');
-    
-    // Italic: *text* (but not for math like a*b or x*y)
-    // Only match when * is at word boundary
-    html = html.replace(/(^|[\s\(])\*([^*\s][^*]*[^*\s])\*([\s\)\.,;:!?]|$)/g, '$1<em class="md-italic">$2</em>$3');
-    html = html.replace(/(^|[\s\(])\*([^*\s])\*([\s\)\.,;:!?]|$)/g, '$1<em class="md-italic">$2</em>$3');
-    
-    // DO NOT process single underscores as italic - they're often used in variable names
-    // html = html.replace(/_(.*?)_/g, ...) - REMOVED
-    
-    // Blockquotes
-    html = html.replace(/^> (.*?)$/gm, '<blockquote class="md-blockquote">$1</blockquote>');
-    html = html.replace(/<\/blockquote>\n<blockquote class="md-blockquote">/g, '<br>');
-    
-    // Horizontal rule
-    html = html.replace(/^(-{3,}|_{3,}|\*{3,})$/gm, '<hr class="md-hr">');
-    
-    // Unordered lists
-    html = html.replace(/^[\-\*] (.*?)$/gm, '<li class="md-li">$1</li>');
-    html = html.replace(/(<li class="md-li">.*?<\/li>)(\n<li class="md-li">)/g, '$1$2');
-    html = html.replace(/(<li class="md-li">.*<\/li>)/gs, '<ul class="md-ul">$1</ul>');
-    
-    // Ordered lists  
-    html = html.replace(/^\d+\. (.*?)$/gm, '<li class="md-li-ordered">$1</li>');
-    html = html.replace(/(<li class="md-li-ordered">.*?<\/li>)(\n<li class="md-li-ordered">)/g, '$1$2');
-    html = html.replace(/(<li class="md-li-ordered">.*<\/li>)/gs, '<ol class="md-ol">$1</ol>');
-    
-    // Links [text](url)
-    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" class="md-link">$1</a>');
-    
-    // Restore math expressions with proper styling
-    mathPlaceholders.forEach((item, idx) => {
-        if (item.type === 'block') {
-            html = html.replace(`@@MATH_BLOCK_${idx}@@`, `<div class="md-math-block">${formatMathExpression(item.content)}</div>`);
-        } else {
-            html = html.replace(`@@MATH_INLINE_${idx}@@`, `<span class="md-math-inline">${formatMathExpression(item.content)}</span>`);
+    // Process block math: $$...$$ or ```math...```
+    text = text.replace(/\$\$([\s\S]*?)\$\$/g, function(match, math) {
+        try {
+            return katex.renderToString(math.trim(), { displayMode: true, throwOnError: false });
+        } catch (e) {
+            return `<div class="math-error">${match}</div>`;
         }
     });
     
-    // Format standalone math-like expressions (equations with =, subscripts, etc.)
-    // Match patterns like: x_t = f(y), M_{memory}, etc.
-    html = html.replace(/([A-Za-z])_\{([^}]+)\}/g, '$1<sub>$2</sub>');
-    html = html.replace(/([A-Za-z])_([A-Za-z0-9])/g, '$1<sub>$2</sub>');
-    html = html.replace(/\^{([^}]+)}/g, '<sup>$1</sup>');
-    html = html.replace(/\^([A-Za-z0-9])/g, '<sup>$1</sup>');
+    // Process ```math code blocks
+    text = text.replace(/```math\s*([\s\S]*?)```/g, function(match, math) {
+        try {
+            return katex.renderToString(math.trim(), { displayMode: true, throwOnError: false });
+        } catch (e) {
+            return `<pre class="math-block-fallback">${math}</pre>`;
+        }
+    });
     
-    // Line breaks (convert remaining newlines)
-    html = html.replace(/\n/g, '<br>');
+    // Process inline math: $...$
+    text = text.replace(/\$([^\$\n]+?)\$/g, function(match, math) {
+        try {
+            return katex.renderToString(math.trim(), { displayMode: false, throwOnError: false });
+        } catch (e) {
+            return `<code class="math-inline-fallback">${math}</code>`;
+        }
+    });
     
-    // Clean up extra <br> after block elements
-    html = html.replace(/<\/(h[3-6]|pre|blockquote|ul|ol|hr|div)><br>/g, '</$1>');
-    html = html.replace(/<br><(h[3-6]|pre|blockquote|ul|ol)/g, '<$1');
-    
-    return html;
+    return text;
 }
 
-// Helper function to format math expressions
-function formatMathExpression(math) {
-    let formatted = math;
-    // Subscripts: x_{text} or x_t
-    formatted = formatted.replace(/([A-Za-z])_\{([^}]+)\}/g, '$1<sub>$2</sub>');
-    formatted = formatted.replace(/([A-Za-z])_([A-Za-z0-9]+)/g, '$1<sub>$2</sub>');
-    // Superscripts: x^{text} or x^2
-    formatted = formatted.replace(/\^{([^}]+)}/g, '<sup>$1</sup>');
-    formatted = formatted.replace(/\^([A-Za-z0-9]+)/g, '<sup>$1</sup>');
-    // Greek letters (common ones)
-    formatted = formatted.replace(/\\alpha/g, 'α');
-    formatted = formatted.replace(/\\beta/g, 'β');
-    formatted = formatted.replace(/\\gamma/g, 'γ');
-    formatted = formatted.replace(/\\delta/g, 'δ');
-    formatted = formatted.replace(/\\epsilon/g, 'ε');
-    formatted = formatted.replace(/\\eta/g, 'η');
-    formatted = formatted.replace(/\\theta/g, 'θ');
-    formatted = formatted.replace(/\\lambda/g, 'λ');
-    formatted = formatted.replace(/\\mu/g, 'μ');
-    formatted = formatted.replace(/\\sigma/g, 'σ');
-    formatted = formatted.replace(/\\tau/g, 'τ');
-    formatted = formatted.replace(/\\phi/g, 'φ');
-    formatted = formatted.replace(/\\psi/g, 'ψ');
-    formatted = formatted.replace(/\\omega/g, 'ω');
-    formatted = formatted.replace(/\\pi/g, 'π');
-    // Math operators
-    formatted = formatted.replace(/\\cdot/g, '·');
-    formatted = formatted.replace(/\\times/g, '×');
-    formatted = formatted.replace(/\\div/g, '÷');
-    formatted = formatted.replace(/\\pm/g, '±');
-    formatted = formatted.replace(/\\leq/g, '≤');
-    formatted = formatted.replace(/\\geq/g, '≥');
-    formatted = formatted.replace(/\\neq/g, '≠');
-    formatted = formatted.replace(/\\approx/g, '≈');
-    formatted = formatted.replace(/\\infty/g, '∞');
-    formatted = formatted.replace(/\\sum/g, '∑');
-    formatted = formatted.replace(/\\prod/g, '∏');
-    formatted = formatted.replace(/\\int/g, '∫');
-    formatted = formatted.replace(/\\partial/g, '∂');
-    formatted = formatted.replace(/\\nabla/g, '∇');
-    formatted = formatted.replace(/\\in/g, '∈');
-    formatted = formatted.replace(/\\subset/g, '⊂');
-    formatted = formatted.replace(/\\rightarrow/g, '→');
-    formatted = formatted.replace(/\\leftarrow/g, '←');
-    formatted = formatted.replace(/\\Rightarrow/g, '⇒');
-    formatted = formatted.replace(/\\forall/g, '∀');
-    formatted = formatted.replace(/\\exists/g, '∃');
-    return formatted;
+// Main markdown formatting function using marked.js + KaTeX
+function formatMarkdown(text) {
+    if (!text) return '';
+    
+    // Initialize marked if not already done
+    if (!window._markedInitialized) {
+        window._markedInitialized = initMarkedRenderer();
+    }
+    
+    let html = text;
+    
+    // First, protect and render math expressions
+    html = renderMath(html);
+    
+    // If marked.js is available, use it for markdown rendering
+    if (typeof marked !== 'undefined') {
+        // Protect already-rendered KaTeX output from being processed by marked
+        const katexPlaceholders = [];
+        html = html.replace(/<span class="katex[\s\S]*?<\/span><\/span><\/span>/g, function(match) {
+            katexPlaceholders.push(match);
+            return `@@KATEX_${katexPlaceholders.length - 1}@@`;
+        });
+        html = html.replace(/<span class="katex-display[\s\S]*?<\/span><\/span><\/span><\/span>/g, function(match) {
+            katexPlaceholders.push(match);
+            return `@@KATEX_${katexPlaceholders.length - 1}@@`;
+        });
+        
+        // Parse markdown
+        try {
+            html = marked.parse(html);
+        } catch (e) {
+            console.error('Marked parsing error:', e);
+        }
+        
+        // Restore KaTeX output
+        katexPlaceholders.forEach((item, idx) => {
+            html = html.replace(`@@KATEX_${idx}@@`, item);
+        });
+    } else {
+        // Fallback: basic markdown processing
+        html = fallbackFormatMarkdown(html);
+    }
+    
+    return `<div class="rendered-markdown">${html}</div>`;
+}
+
+// Fallback markdown formatter (used if marked.js fails to load)
+function fallbackFormatMarkdown(text) {
+    let html = text;
+    
+    // Code blocks
+    html = html.replace(/```(\w*)\n?([\s\S]*?)```/g, '<pre><code class="lang-$1">$2</code></pre>');
+    
+    // Inline code
+    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+    
+    // Headers
+    html = html.replace(/^#### (.*?)$/gm, '<h4>$1</h4>');
+    html = html.replace(/^### (.*?)$/gm, '<h3>$1</h3>');
+    html = html.replace(/^## (.*?)$/gm, '<h2>$1</h2>');
+    html = html.replace(/^# (.*?)$/gm, '<h1>$1</h1>');
+    
+    // Bold and italic
+    html = html.replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>');
+    html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/(^|[\s\(])\*([^*\s][^*]*?)\*([\s\)\.,;:!?]|$)/g, '$1<em>$2</em>$3');
+    
+    // Blockquotes
+    html = html.replace(/^> (.*?)$/gm, '<blockquote>$1</blockquote>');
+    
+    // Lists
+    html = html.replace(/^[\-\*] (.*?)$/gm, '<li>$1</li>');
+    html = html.replace(/^\d+\. (.*?)$/gm, '<li>$1</li>');
+    
+    // Links
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+    
+    // Line breaks
+    html = html.replace(/\n/g, '<br>');
+    
+    return html;
 }
 
 // Toggle collapsible sections

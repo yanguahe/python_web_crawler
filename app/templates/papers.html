@@ -46,15 +46,19 @@
             <span>⬇️</span> Download Latest ({{ latest_backup }})
         </a>
         {% endif %}
-        <select id="backupSelect" onchange="updateDownloadLink()" style="padding: 8px 12px; background: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; font-size: 0.9em;">
+        <select id="backupSelect" onchange="updateBackupButtons()" style="padding: 8px 12px; background: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; font-size: 0.9em;">
             <option value="">-- Select Backup --</option>
             {% for backup in backups %}
             <option value="{{ backup }}">{{ backup }}</option>
             {% endfor %}
         </select>
         <button id="downloadSelectedBtn" onclick="downloadSelectedBackup()" class="action-btn secondary" style="padding: 8px 16px;" disabled>
-            <span>⬇️</span> Download Selected
+            <span>⬇️</span> Download
         </button>
+        <button id="importSelectedBtn" onclick="importSelectedBackup()" class="action-btn" style="padding: 8px 16px; background: rgba(56, 139, 253, 0.15); border: 1px solid rgba(56, 139, 253, 0.4); color: #58a6ff;" disabled>
+            <span>📤</span> Restore
+        </button>
+        <span id="importStatus" style="color: #8b949e; font-size: 0.9em;"></span>
     </div>
 
     {% if papers %}
@@ -275,16 +279,76 @@ async function createBackup() {
     }
 }
 
-function updateDownloadLink() {
+function updateBackupButtons() {
     const select = document.getElementById('backupSelect');
-    const btn = document.getElementById('downloadSelectedBtn');
-    btn.disabled = !select.value;
+    const downloadBtn = document.getElementById('downloadSelectedBtn');
+    const importBtn = document.getElementById('importSelectedBtn');
+    const hasSelection = !!select.value;
+    downloadBtn.disabled = !hasSelection;
+    importBtn.disabled = !hasSelection;
 }
 
 function downloadSelectedBackup() {
     const select = document.getElementById('backupSelect');
     if (select.value) {
         window.open(`/papers/api/backup/download/${select.value}`, '_blank');
+    }
+}
+
+async function importSelectedBackup() {
+    const select = document.getElementById('backupSelect');
+    const filename = select.value;
+    
+    if (!filename) {
+        alert('Please select a backup file first');
+        return;
+    }
+    
+    // Confirm import action
+    const confirmMsg = `Are you sure you want to restore from "${filename}"?\n\n` +
+        `⚠️ WARNING: This will MERGE the backup data with existing data.\n` +
+        `Existing files with the same name will be OVERWRITTEN.`;
+    
+    if (!confirm(confirmMsg)) {
+        return;
+    }
+    
+    const btn = document.getElementById('importSelectedBtn');
+    const statusEl = document.getElementById('importStatus');
+    const originalHTML = btn.innerHTML;
+    
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳</span> Restoring...';
+    statusEl.textContent = 'Extracting backup...';
+    statusEl.style.color = '#8b949e';
+    
+    try {
+        const response = await fetch(`/papers/api/backup/import/${encodeURIComponent(filename)}`, {
+            method: 'POST'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            btn.innerHTML = '<span>✅</span> Done!';
+            statusEl.textContent = `Restore complete! ${data.message}`;
+            statusEl.style.color = '#3fb950';
+            
+            // Reload page to show imported data
+            setTimeout(() => location.reload(), 2000);
+        } else {
+            throw new Error(data.detail || 'Failed to restore backup');
+        }
+    } catch (error) {
+        console.error('Error restoring backup:', error);
+        btn.innerHTML = '<span>❌</span> Error';
+        statusEl.textContent = 'Error: ' + error.message;
+        statusEl.style.color = '#f85149';
+        
+        setTimeout(() => {
+            btn.innerHTML = originalHTML;
+            btn.disabled = false;
+        }, 3000);
     }
 }
 
