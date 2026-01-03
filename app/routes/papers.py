@@ -347,7 +347,8 @@ async def api_import_backup(filename: str):
 @router.post("/api/upload-pdf", tags=["api"])
 async def api_upload_pdf(file: UploadFile = File(...)):
     """
-    Upload a PDF file, extract text, parse title/abstract, and create a paper record.
+    Upload a PDF file, extract text, parse abstract, and create a paper record.
+    The paper title will be the PDF filename (without extension).
     """
     # Validate file type
     if not file.filename.lower().endswith('.pdf'):
@@ -356,14 +357,17 @@ async def api_upload_pdf(file: UploadFile = File(...)):
     try:
         import fitz  # PyMuPDF
         
+        # Use the PDF filename (without extension) as the title
+        base_name = Path(file.filename).stem
+        title = base_name  # Use filename as title directly
+        
         # Generate a unique ID for this uploaded paper (using timestamp + filename)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        base_name = Path(file.filename).stem
-        paper_id = f"upload_{timestamp}_{base_name[:30]}"
+        paper_id = f"upload_{timestamp}_{file_handler._sanitize_filename(base_name)[:30]}"
         
-        # Save the uploaded PDF
-        pdf_filename = f"{file_handler._sanitize_filename(base_name)}.pdf"
-        pdf_path = file_handler.pdf_dir / pdf_filename
+        # Save the uploaded PDF using the original filename
+        safe_title = file_handler._sanitize_filename(title)
+        pdf_path = file_handler.pdf_dir / f"{safe_title}.pdf"
         
         # Write PDF file in chunks
         CHUNK_SIZE = 1024 * 1024  # 1MB chunks
@@ -388,19 +392,15 @@ async def api_upload_pdf(file: UploadFile = File(...)):
         
         text_content = "".join(full_text)
         
-        # Save text file
-        text_filename = f"{file_handler._sanitize_filename(base_name)}.txt"
-        text_path = file_handler.text_dir / text_filename
+        # Save text file using the same title
+        text_path = file_handler.text_dir / f"{safe_title}.txt"
         with open(text_path, "w", encoding="utf-8") as f:
             f.write(text_content)
-        
-        # Parse title from text
-        title = _parse_title_from_text(text_content, base_name)
         
         # Parse abstract from text
         abstract = _parse_abstract_from_text(text_content)
         
-        # Create Paper object
+        # Create Paper object with filename as title
         paper = Paper(
             id=paper_id,
             title=title,
@@ -415,19 +415,6 @@ async def api_upload_pdf(file: UploadFile = File(...)):
         
         # Save paper record
         file_handler.save_paper(paper)
-        
-        # Rename files to use the parsed title
-        safe_title = file_handler._sanitize_filename(title)
-        
-        # Rename PDF if title is different from original filename
-        if safe_title != file_handler._sanitize_filename(base_name):
-            new_pdf_path = file_handler.pdf_dir / f"{safe_title}.pdf"
-            if not new_pdf_path.exists():
-                pdf_path.rename(new_pdf_path)
-            
-            new_text_path = file_handler.text_dir / f"{safe_title}.txt"
-            if not new_text_path.exists():
-                text_path.rename(new_text_path)
         
         return {
             "success": True,
