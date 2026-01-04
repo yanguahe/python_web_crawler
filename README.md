@@ -2,7 +2,7 @@
 
 一个用于搜索、保存和**AI智能分析** arXiv 论文的 Python Web 应用程序。集成 DeepSeek API 实现论文摘要分析、全文深度分析和多轮问答功能。
 
-![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)
+![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)
 ![DeepSeek](https://img.shields.io/badge/DeepSeek-Reasoner-purple.svg)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
@@ -32,7 +32,7 @@
 
 ### Prerequisites
 
-- Python 3.9 或更高版本
+- Python 3.12 或更高版本
 - pip (Python 包管理器)
 - DeepSeek API Key（用于 AI 分析功能）
 
