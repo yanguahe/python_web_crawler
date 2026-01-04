@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 
 {% block head %}
-<!-- KaTeX for math rendering (BootCDN - China accessible) -->
-<link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/KaTeX/0.16.9/katex.min.css">
-<!-- Highlight.js for code syntax highlighting (BootCDN - China accessible) -->
-<link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+<!-- KaTeX for math rendering (本地资源) -->
+<link rel="stylesheet" href="/static/vendor/katex/katex.min.css">
+<!-- Highlight.js for code syntax highlighting (本地资源) -->
+<link rel="stylesheet" href="/static/vendor/highlight/atom-one-dark.min.css">
 <style>
 /* Enhanced Markdown Rendering Styles */
 .rendered-markdown {
@@ -468,14 +468,14 @@
 {% endblock %}
 
 {% block scripts %}
-<!-- Markdown & Math rendering libraries (BootCDN - China accessible) -->
-<script src="https://cdn.bootcdn.net/ajax/libs/marked/12.0.0/marked.min.js"></script>
-<script src="https://cdn.bootcdn.net/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
-<script src="https://cdn.bootcdn.net/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-<script src="https://cdn.bootcdn.net/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
-<script src="https://cdn.bootcdn.net/ajax/libs/highlight.js/11.9.0/languages/javascript.min.js"></script>
-<script src="https://cdn.bootcdn.net/ajax/libs/highlight.js/11.9.0/languages/bash.min.js"></script>
-<script src="https://cdn.bootcdn.net/ajax/libs/highlight.js/11.9.0/languages/json.min.js"></script>
+<!-- Markdown & Math rendering libraries (本地资源) -->
+<script src="/static/vendor/marked/marked.min.js"></script>
+<script src="/static/vendor/katex/katex.min.js"></script>
+<script src="/static/vendor/highlight/highlight.min.js"></script>
+<script src="/static/vendor/highlight/languages/python.min.js"></script>
+<script src="/static/vendor/highlight/languages/javascript.min.js"></script>
+<script src="/static/vendor/highlight/languages/bash.min.js"></script>
+<script src="/static/vendor/highlight/languages/json.min.js"></script>
 
 <!-- Store data in hidden elements to avoid JavaScript parsing issues -->
 <script type="application/json" id="paper-title-data">{{ paper.title | tojson | safe }}</script>
@@ -1226,10 +1226,20 @@ function initMarkedRenderer() {
 // Render LaTeX math using KaTeX
 function renderMath(text) {
     if (typeof katex === 'undefined') {
+        console.warn('renderMath: KaTeX is not loaded!');
         return text;
     }
     
-    // Process block math: $$...$$ or ```math...```
+    // Process block math: \[...\] (LaTeX style)
+    text = text.replace(/\\\[([\s\S]*?)\\\]/g, function(match, math) {
+        try {
+            return katex.renderToString(math.trim(), { displayMode: true, throwOnError: false });
+        } catch (e) {
+            return `<div class="math-error">${match}</div>`;
+        }
+    });
+    
+    // Process block math: $$...$$
     text = text.replace(/\$\$([\s\S]*?)\$\$/g, function(match, math) {
         try {
             return katex.renderToString(math.trim(), { displayMode: true, throwOnError: false });
@@ -1244,6 +1254,15 @@ function renderMath(text) {
             return katex.renderToString(math.trim(), { displayMode: true, throwOnError: false });
         } catch (e) {
             return `<pre class="math-block-fallback">${math}</pre>`;
+        }
+    });
+    
+    // Process inline math: \(...\) (LaTeX style)
+    text = text.replace(/\\\(([\s\S]*?)\\\)/g, function(match, math) {
+        try {
+            return katex.renderToString(math.trim(), { displayMode: false, throwOnError: false });
+        } catch (e) {
+            return `<code class="math-inline-fallback">${math}</code>`;
         }
     });
     
@@ -1364,17 +1383,24 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 async function loadQAHistory() {
+    // Check if Q&A elements exist (they won't if text hasn't been extracted)
+    const clearAllBtn = document.getElementById('qaClearAllBtn');
+    const emptyMessage = document.getElementById('qaEmptyMessage');
+    if (!clearAllBtn || !emptyMessage) {
+        return; // Q&A section not present on this page
+    }
+    
     try {
         const response = await fetch(`/analysis/qa/history/${encodeURIComponent(PAPER_TITLE)}`);
         const data = await response.json();
         
         if (data.success && data.history && data.history.length > 0) {
             renderQAHistory(data.history);
-            document.getElementById('qaClearAllBtn').style.display = 'inline-flex';
-            document.getElementById('qaEmptyMessage').style.display = 'none';
+            clearAllBtn.style.display = 'inline-flex';
+            emptyMessage.style.display = 'none';
         } else {
-            document.getElementById('qaEmptyMessage').style.display = 'block';
-            document.getElementById('qaClearAllBtn').style.display = 'none';
+            emptyMessage.style.display = 'block';
+            clearAllBtn.style.display = 'none';
         }
     } catch (error) {
         console.error('Error loading Q&A history:', error);
@@ -1400,7 +1426,9 @@ function renderQAHistory(history) {
                 <button class="qa-entry-delete" onclick="deleteQAEntry(${index})" title="删除此条">🗑️</button>
             </div>
             <div class="qa-entry-question">
-                <strong>❓ Question:</strong> ${escapeHtml(entry.question)}
+                <strong>❓ Question:</strong>
+                <span class="qa-question-text" id="qa-question-text-${index}">${escapeHtml(entry.question)}</span>
+                <button class="qa-question-expand" id="qa-question-expand-${index}" onclick="toggleQuestionExpand(${index})" style="display: none;">展开全文 ▼</button>
             </div>
             <div class="qa-entry-details" id="qa-details-${index}" style="display: none;">
                 <div class="qa-entry-reasoning">
@@ -1416,6 +1444,9 @@ function renderQAHistory(history) {
         
         historyList.appendChild(entryEl);
     });
+    
+    // 检查哪些问题需要展开按钮（延迟执行以确保DOM已渲染）
+    setTimeout(checkQuestionOverflow, 100);
 }
 
 function toggleQAEntry(index) {
@@ -1429,6 +1460,36 @@ function toggleQAEntry(index) {
         details.style.display = 'none';
         toggleBtn.textContent = '▼';
     }
+}
+
+function toggleQuestionExpand(index) {
+    const textEl = document.getElementById(`qa-question-text-${index}`);
+    const expandBtn = document.getElementById(`qa-question-expand-${index}`);
+    
+    if (textEl.classList.contains('expanded')) {
+        textEl.classList.remove('expanded');
+        expandBtn.textContent = '展开全文 ▼';
+    } else {
+        textEl.classList.add('expanded');
+        expandBtn.textContent = '收起 ▲';
+    }
+}
+
+function checkQuestionOverflow() {
+    // 检查所有问题文本是否溢出，如果溢出则显示展开按钮
+    document.querySelectorAll('.qa-question-text').forEach((el) => {
+        const index = el.id.replace('qa-question-text-', '');
+        const expandBtn = document.getElementById(`qa-question-expand-${index}`);
+        
+        if (expandBtn) {
+            // 检查内容是否被截断（scrollHeight > clientHeight 表示有溢出）
+            if (el.scrollHeight > el.clientHeight + 5) {
+                expandBtn.style.display = 'inline-block';
+            } else {
+                expandBtn.style.display = 'none';
+            }
+        }
+    });
 }
 
 async function askQuestion() {

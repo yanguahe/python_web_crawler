@@ -1927,11 +1927,43 @@ a:hover {
     font-size: 1rem;
     background: var(--color-bg-secondary);
     line-height: 1.6;
+    position: relative;
 }
 
 .qa-entry-question strong {
     color: #a78bfa;
     font-size: 1.05rem;
+}
+
+.qa-question-text {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: all 0.3s ease;
+}
+
+.qa-question-text.expanded {
+    -webkit-line-clamp: unset;
+    display: block;
+}
+
+.qa-question-expand {
+    background: none;
+    border: none;
+    color: var(--color-accent-primary);
+    cursor: pointer;
+    font-size: 0.85rem;
+    padding: 4px 8px;
+    margin-top: 6px;
+    display: inline-block;
+    transition: color 0.2s ease;
+}
+
+.qa-question-expand:hover {
+    color: var(--color-accent-secondary);
+    text-decoration: underline;
 }
 
 .qa-entry-details {
